@@ -216,3 +216,10 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Frontend (Vite / React)
+node_modules/
+frontend/dist/
+
+# TerangaCare (backend/app — modèles, Alembic, BDD locale)
+backend/app/terangacare.db
