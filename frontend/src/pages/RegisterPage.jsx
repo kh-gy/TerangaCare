@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useState } from 'react';
+import { Link, Navigate } from 'react-router-dom';
+import { useAuth } from '../auth/useAuth';
 
 const RegisterPage = () => {
   const [form, setForm] = useState({
@@ -11,6 +12,20 @@ const RegisterPage = () => {
   });
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
+  const [submitError, setSubmitError] = useState('');
+  const { authenticated, error, initialized, isConfigured, register } = useAuth();
+
+  if (!initialized) {
+    return (
+      <div className="min-h-screen bg-[#eef3fa] flex items-center justify-center px-4 py-8 text-[#1a3c6e] font-semibold">
+        Initialisation de Keycloak...
+      </div>
+    );
+  }
+
+  if (authenticated) {
+    return <Navigate to="/" replace />;
+  }
 
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value });
@@ -18,7 +33,17 @@ const RegisterPage = () => {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    // TODO: connect to backend auth
+
+    if (!isConfigured) {
+      setSubmitError('La configuration Keycloak est manquante. Vérifie les variables VITE_KEYCLOAK_* .');
+      return;
+    }
+
+    setSubmitError('');
+
+    void register({ redirectUri: `${window.location.origin}/register` }).catch((authError) => {
+      setSubmitError(authError instanceof Error ? authError.message : 'Impossible d\'ouvrir Keycloak.');
+    });
   };
 
   return (
@@ -34,9 +59,15 @@ const RegisterPage = () => {
           </div>
           <h1 className="text-2xl font-bold text-[#1a3c6e]">TerangaCare</h1>
           <p className="text-gray-500 text-sm text-center mt-1">
-            Créez votre compte et rejoignez notre réseau de santé.
+            Créez votre compte via Keycloak pour centraliser l'identité et les rôles.
           </p>
         </div>
+
+        {(error || submitError) && (
+          <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            {submitError || error?.message}
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-5">
           {/* Role selector */}
@@ -181,7 +212,7 @@ const RegisterPage = () => {
             type="submit"
             className="w-full bg-[#1a3c6e] text-white py-4 rounded-full font-semibold text-base hover:bg-[#152f58] transition-colors mt-1 shadow-md"
           >
-            Créer mon compte
+            Créer mon compte avec Keycloak
           </button>
         </form>
 
