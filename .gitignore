@@ -217,5 +217,9 @@ __marimo__/
 # Streamlit
 .streamlit/secrets.toml
 
-# Claude Code
-.claude/
+# Frontend (Vite / React)
+node_modules/
+frontend/dist/
+
+# TerangaCare (backend/app — modèles, Alembic, BDD locale)
+backend/app/terangacare.db
