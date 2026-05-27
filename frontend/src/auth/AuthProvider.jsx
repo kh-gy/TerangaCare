@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { AuthContext } from './authContext';
-import { authTokenKey, fetchCurrentUser, getApiBaseUrl, loginWithCredentials } from './authApi';
+import { authTokenKey, fetchCurrentUser, getApiBaseUrl, loginWithCredentials, registerWithCredentials } from './authApi';
 
 export const AuthProvider = ({ children }) => {
   const [initialized, setInitialized] = useState(() => !localStorage.getItem(authTokenKey));
@@ -56,8 +56,10 @@ export const AuthProvider = ({ children }) => {
     return payload;
   };
 
-  const register = async () => {
-    throw new Error('La création de compte n\'est pas encore branchée sur le backend.');
+  const register = async ({ email, password, firstName, lastName }) => {
+    const payload = await registerWithCredentials({ email, password, firstName, lastName });
+    setError(null);
+    return payload;
   };
 
   const logout = () => {

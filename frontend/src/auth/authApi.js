@@ -23,6 +23,29 @@ export async function loginWithCredentials(email, password) {
   return payload;
 }
 
+export async function registerWithCredentials({ email, password, firstName, lastName }) {
+  const response = await fetch(`${apiBaseUrl}/auth/register`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      email,
+      password,
+      first_name: firstName,
+      last_name: lastName,
+    }),
+  });
+
+  const payload = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    throw new Error(payload.detail || 'Inscription impossible');
+  }
+
+  return payload;
+}
+
 export async function fetchCurrentUser(token) {
   const response = await fetch(`${apiBaseUrl}/auth/me`, {
     headers: {

@@ -1,4 +1,5 @@
 from typing import Any
+import logging
 
 import httpx
 from fastapi import Depends, FastAPI, HTTPException, status
@@ -9,6 +10,7 @@ from app.security import decode_access_token, get_current_user
 from app.settings import get_settings
 
 settings = get_settings()
+logger = logging.getLogger(__name__)
 
 app = FastAPI(title="TerangaCare API", version="0.1.0")
 
@@ -101,18 +103,33 @@ async def register(payload: RegisterRequest) -> RegisterResponse:
         token_data["client_secret"] = settings.keycloak_client_secret
 
     async with httpx.AsyncClient(timeout=15.0) as client:
-        token_resp = await client.post(settings.token_url, data=token_data)
+        try:
+            token_resp = await client.post(settings.token_url, data=token_data)
+        except httpx.RequestError as exc:
+            logger.exception("Keycloak token request failed during registration")
+            raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f"Keycloak token request failed: {exc}") from exc
 
         if token_resp.status_code >= 400:
-            raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Unable to obtain admin token from Keycloak")
+            logger.error("Keycloak token request rejected during registration: status=%s body=%s", token_resp.status_code, token_resp.text)
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail=f"Unable to obtain admin token from Keycloak (status {token_resp.status_code})",
+            )
 
         admin_token = token_resp.json().get("access_token")
+        if not admin_token:
+            logger.error("Keycloak token response missing access_token: body=%s", token_resp.text)
+            raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Keycloak token response missing access token")
 
         # check existing user by email
         users_url = f"{settings.keycloak_server_url.rstrip('/')}/admin/realms/{settings.keycloak_realm}/users"
         params = {"email": payload.email}
         headers = {"Authorization": f"Bearer {admin_token}", "Content-Type": "application/json"}
-        existing = await client.get(users_url, params=params, headers=headers)
+        try:
+            existing = await client.get(users_url, params=params, headers=headers)
+        except httpx.RequestError as exc:
+            logger.exception("Keycloak user lookup failed during registration")
+            raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f"Keycloak user lookup failed: {exc}") from exc
         if existing.status_code == 200 and existing.json():
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="User with this email already exists")
 
@@ -126,14 +143,27 @@ async def register(payload: RegisterRequest) -> RegisterResponse:
             "credentials": [{"type": "password", "value": payload.password, "temporary": False}],
         }
 
-        create_resp = await client.post(users_url, json=create_payload, headers=headers)
+        try:
+            create_resp = await client.post(users_url, json=create_payload, headers=headers)
+        except httpx.RequestError as exc:
+            logger.exception("Keycloak user creation request failed during registration")
+            raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f"Keycloak user creation request failed: {exc}") from exc
         if create_resp.status_code not in (201, 204):
             # try to extract error
             try:
                 detail = create_resp.json()
             except Exception:
                 detail = create_resp.text
-            raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f"Failed to create user in Keycloak: {detail}")
+            logger.error(
+                "Keycloak user creation rejected: status=%s body=%s payload=%s",
+                create_resp.status_code,
+                detail,
+                create_payload,
+            )
+            raise HTTPException(
+                status_code=create_resp.status_code,
+                detail=f"Failed to create user in Keycloak: {detail}",
+            )
 
         # attempt to read Location header for created id
         created_id = None

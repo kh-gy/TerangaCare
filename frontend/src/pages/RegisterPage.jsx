@@ -1,10 +1,12 @@
 import { useState } from 'react';
-import { Link, Navigate } from 'react-router-dom';
+import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/useAuth';
 
 const RegisterPage = () => {
+  const navigate = useNavigate();
   const [form, setForm] = useState({
-    fullName: '',
+    firstName: '',
+    lastName: '',
     email: '',
     password: '',
     confirmPassword: '',
@@ -35,15 +37,27 @@ const RegisterPage = () => {
     e.preventDefault();
 
     if (!isConfigured) {
-      setSubmitError('La configuration Keycloak est manquante. Vérifie les variables VITE_KEYCLOAK_* .');
+      setSubmitError('La configuration API est manquante. Vérifie la variable VITE_API_BASE_URL.');
+      return;
+    }
+
+    if (form.password !== form.confirmPassword) {
+      setSubmitError('Les mots de passe ne correspondent pas.');
       return;
     }
 
     setSubmitError('');
 
-    void register({ redirectUri: `${window.location.origin}/register` }).catch((authError) => {
-      setSubmitError(authError instanceof Error ? authError.message : 'Impossible d\'ouvrir Keycloak.');
-    });
+    void register({
+      email: form.email,
+      password: form.password,
+      firstName: form.firstName,
+      lastName: form.lastName,
+    })
+      .then(() => navigate('/login', { replace: true }))
+      .catch((authError) => {
+        setSubmitError(authError instanceof Error ? authError.message : 'Impossible de créer le compte.');
+      });
   };
 
   return (
@@ -94,22 +108,38 @@ const RegisterPage = () => {
             </div>
           </div>
 
-          {/* Full name */}
+          {/* First and last name */}
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">Nom complet</label>
-            <div className="flex items-center border-2 border-[#c8d9ef] rounded-xl px-3 py-3 focus-within:border-[#1a3c6e] transition-colors bg-white">
-              <svg className="w-5 h-5 text-gray-400 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-              </svg>
-              <input
-                type="text"
-                name="fullName"
-                placeholder="Fatou Diallo"
-                value={form.fullName}
-                onChange={handleChange}
-                required
-                className="flex-1 outline-none text-sm text-gray-700 placeholder-gray-400 bg-transparent"
-              />
+            <label className="block text-sm font-semibold text-gray-700 mb-2">Nom</label>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div className="flex min-w-0 items-center overflow-hidden border-2 border-[#c8d9ef] rounded-xl px-3 py-3 focus-within:border-[#1a3c6e] transition-colors bg-white">
+                <svg className="w-5 h-5 text-gray-400 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                </svg>
+                <input
+                  type="text"
+                  name="firstName"
+                  placeholder="Fatou"
+                  value={form.firstName}
+                  onChange={handleChange}
+                  required
+                  className="w-full min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap outline-none text-sm text-gray-700 placeholder-gray-400 bg-transparent"
+                />
+              </div>
+              <div className="flex min-w-0 items-center overflow-hidden border-2 border-[#c8d9ef] rounded-xl px-3 py-3 focus-within:border-[#1a3c6e] transition-colors bg-white">
+                <svg className="w-5 h-5 text-gray-400 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                </svg>
+                <input
+                  type="text"
+                  name="lastName"
+                  placeholder="Diallo"
+                  value={form.lastName}
+                  onChange={handleChange}
+                  required
+                  className="w-full min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap outline-none text-sm text-gray-700 placeholder-gray-400 bg-transparent"
+                />
+              </div>
             </div>
           </div>
 
