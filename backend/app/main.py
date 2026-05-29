@@ -33,6 +33,7 @@ class RegisterRequest(BaseModel):
     password: str
     first_name: str | None = None
     last_name: str | None = None
+    role: str | None = "patient"
 
 
 class RegisterResponse(BaseModel):
@@ -170,6 +171,117 @@ async def register(payload: RegisterRequest) -> RegisterResponse:
         location = create_resp.headers.get("Location")
         if location:
             created_id = location.rstrip("/").split("/")[-1]
+
+        # if Location header missing, try to lookup user by email
+        if not created_id:
+            try:
+                lookup = await client.get(users_url, params=params, headers=headers)
+            except httpx.RequestError as exc:
+                logger.exception("Keycloak user lookup failed after create")
+                raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f"Keycloak user lookup failed: {exc}") from exc
+            if lookup.status_code == 200 and lookup.json():
+                created_id = lookup.json()[0].get("id")
+
+        # assign role to created user (if provided)
+        assigned_role = None
+        if created_id and payload.role:
+            role_name = payload.role
+            role_url = f"{settings.keycloak_server_url.rstrip('/')}" + f"/admin/realms/{settings.keycloak_realm}/roles/{role_name}"
+            try:
+                role_resp = await client.get(role_url, headers=headers)
+            except httpx.RequestError as exc:
+                logger.exception("Keycloak role fetch failed during registration")
+                raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f"Keycloak role fetch failed: {exc}") from exc
+
+            if role_resp.status_code == 200:
+                # realm role found
+                role_rep = role_resp.json()
+                mapping_url = f"{settings.keycloak_server_url.rstrip('/')}" + f"/admin/realms/{settings.keycloak_realm}/users/{created_id}/role-mappings/realm"
+                try:
+                    map_resp = await client.post(mapping_url, json=[role_rep], headers=headers)
+                except httpx.RequestError as exc:
+                    logger.exception("Keycloak role assignment request failed during registration")
+                    raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f"Keycloak role assignment failed: {exc}") from exc
+
+                if map_resp.status_code not in (204, 201, 200):
+                    logger.error("Keycloak role assignment rejected: status=%s body=%s", map_resp.status_code, map_resp.text)
+                    raise HTTPException(status_code=map_resp.status_code, detail=f"Failed to assign role: {map_resp.text}")
+
+                assigned_role = role_name
+            else:
+                # role not found via direct GET; try listing realm roles and match by name
+                logger.debug("Direct GET for realm role failed (status=%s), listing realm roles to locate '%s'", role_resp.status_code if role_resp is not None else 'None', role_name)
+                roles_list_url = f"{settings.keycloak_server_url.rstrip('/')}" + f"/admin/realms/{settings.keycloak_realm}/roles"
+                try:
+                    roles_list_resp = await client.get(roles_list_url, headers=headers)
+                except httpx.RequestError as exc:
+                    logger.exception("Keycloak realm roles list fetch failed during registration")
+                    raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f"Keycloak roles list fetch failed: {exc}") from exc
+
+                realm_role_found = None
+                if roles_list_resp.status_code == 200:
+                    for r in roles_list_resp.json():
+                        if r.get("name") == role_name:
+                            realm_role_found = r
+                            break
+
+                if realm_role_found:
+                    role_rep = realm_role_found
+                    mapping_url = f"{settings.keycloak_server_url.rstrip('/')}" + f"/admin/realms/{settings.keycloak_realm}/users/{created_id}/role-mappings/realm"
+                    try:
+                        map_resp = await client.post(mapping_url, json=[role_rep], headers=headers)
+                    except httpx.RequestError as exc:
+                        logger.exception("Keycloak role assignment request failed during registration")
+                        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f"Keycloak role assignment failed: {exc}") from exc
+
+                    if map_resp.status_code not in (204, 201, 200):
+                        logger.error("Keycloak role assignment rejected: status=%s body=%s", map_resp.status_code, map_resp.text)
+                        raise HTTPException(status_code=map_resp.status_code, detail=f"Failed to assign role: {map_resp.text}")
+
+                    assigned_role = role_name
+                else:
+                    # try client roles fallback (client roles live under clients/{id}/roles/{role})
+                    logger.debug("Realm role not found in list, trying client roles for '%s'", role_name)
+                logger.debug("Realm role not found, trying client roles for '%s'", role_name)
+                # get client internal id
+                clients_url = f"{settings.keycloak_server_url.rstrip('/')}" + f"/admin/realms/{settings.keycloak_realm}/clients"
+                try:
+                    clients_resp = await client.get(clients_url, params={"clientId": settings.keycloak_client_id}, headers=headers)
+                except httpx.RequestError as exc:
+                    logger.exception("Keycloak clients lookup failed during role assignment")
+                    raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f"Keycloak clients lookup failed: {exc}") from exc
+
+                if clients_resp.status_code != 200 or not clients_resp.json():
+                    logger.error("Client '%s' not found when attempting client role lookup", settings.keycloak_client_id)
+                    raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Role '{role_name}' not found in realm and client not found")
+
+                client_obj = clients_resp.json()[0]
+                client_uuid = client_obj.get("id")
+                # fetch client role
+                client_role_url = f"{settings.keycloak_server_url.rstrip('/')}" + f"/admin/realms/{settings.keycloak_realm}/clients/{client_uuid}/roles/{role_name}"
+                try:
+                    client_role_resp = await client.get(client_role_url, headers=headers)
+                except httpx.RequestError as exc:
+                    logger.exception("Keycloak client role fetch failed during registration")
+                    raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f"Keycloak client role fetch failed: {exc}") from exc
+
+                if client_role_resp.status_code != 200:
+                    logger.error("Requested role not found as realm or client role: %s", role_name)
+                    raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Role '{role_name}' not found in Keycloak (realm or client)")
+
+                client_role_rep = client_role_resp.json()
+                mapping_url_client = f"{settings.keycloak_server_url.rstrip('/')}" + f"/admin/realms/{settings.keycloak_realm}/users/{created_id}/role-mappings/clients/{client_uuid}"
+                try:
+                    map_resp = await client.post(mapping_url_client, json=[client_role_rep], headers=headers)
+                except httpx.RequestError as exc:
+                    logger.exception("Keycloak client role assignment request failed during registration")
+                    raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f"Keycloak client role assignment failed: {exc}") from exc
+
+                if map_resp.status_code not in (204, 201, 200):
+                    logger.error("Keycloak client role assignment rejected: status=%s body=%s", map_resp.status_code, map_resp.text)
+                    raise HTTPException(status_code=map_resp.status_code, detail=f"Failed to assign client role: {map_resp.text}")
+
+                assigned_role = role_name
 
     return RegisterResponse(id=created_id, message="User created")
 

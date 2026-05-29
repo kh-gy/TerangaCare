@@ -53,6 +53,7 @@ const RegisterPage = () => {
       password: form.password,
       firstName: form.firstName,
       lastName: form.lastName,
+      role: form.role,
     })
       .then(() => navigate('/login', { replace: true }))
       .catch((authError) => {

@@ -56,8 +56,8 @@ export const AuthProvider = ({ children }) => {
     return payload;
   };
 
-  const register = async ({ email, password, firstName, lastName }) => {
-    const payload = await registerWithCredentials({ email, password, firstName, lastName });
+  const register = async ({ email, password, firstName, lastName, role }) => {
+    const payload = await registerWithCredentials({ email, password, firstName, lastName, role });
     setError(null);
     return payload;
   };

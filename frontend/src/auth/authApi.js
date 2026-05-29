@@ -23,7 +23,7 @@ export async function loginWithCredentials(email, password) {
   return payload;
 }
 
-export async function registerWithCredentials({ email, password, firstName, lastName }) {
+export async function registerWithCredentials({ email, password, firstName, lastName, role }) {
   const response = await fetch(`${apiBaseUrl}/auth/register`, {
     method: 'POST',
     headers: {
@@ -34,6 +34,7 @@ export async function registerWithCredentials({ email, password, firstName, last
       password,
       first_name: firstName,
       last_name: lastName,
+      role,
     }),
   });
 
