@@ -43,6 +43,7 @@ class Utilisateur(Base):
     __tablename__ = "utilisateurs"
 
     id: Mapped[int] = mapped_column(primary_key=True)
+    keycloak_sub: Mapped[str | None] = mapped_column(String(255), unique=True, index=True)
     nom: Mapped[str] = mapped_column(String(100), nullable=False)
     prenom: Mapped[str] = mapped_column(String(100), nullable=False)
     email: Mapped[str] = mapped_column(String(255), unique=True, index=True, nullable=False)

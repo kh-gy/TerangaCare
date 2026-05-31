@@ -1,9 +1,12 @@
-import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useState } from 'react';
+import { Link, Navigate, useNavigate } from 'react-router-dom';
+import { useAuth } from '../auth/useAuth';
 
 const RegisterPage = () => {
+  const navigate = useNavigate();
   const [form, setForm] = useState({
-    fullName: '',
+    firstName: '',
+    lastName: '',
     email: '',
     password: '',
     confirmPassword: '',
@@ -11,6 +14,20 @@ const RegisterPage = () => {
   });
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
+  const [submitError, setSubmitError] = useState('');
+  const { authenticated, error, initialized, isConfigured, register } = useAuth();
+
+  if (!initialized) {
+    return (
+      <div className="min-h-screen bg-[#eef3fa] flex items-center justify-center px-4 py-8 text-[#1a3c6e] font-semibold">
+        Initialisation de Keycloak...
+      </div>
+    );
+  }
+
+  if (authenticated) {
+    return <Navigate to="/" replace />;
+  }
 
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value });
@@ -18,7 +35,30 @@ const RegisterPage = () => {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    // TODO: connect to backend auth
+
+    if (!isConfigured) {
+      setSubmitError('La configuration API est manquante. Vérifie la variable VITE_API_BASE_URL.');
+      return;
+    }
+
+    if (form.password !== form.confirmPassword) {
+      setSubmitError('Les mots de passe ne correspondent pas.');
+      return;
+    }
+
+    setSubmitError('');
+
+    void register({
+      email: form.email,
+      password: form.password,
+      firstName: form.firstName,
+      lastName: form.lastName,
+      role: form.role,
+    })
+      .then(() => navigate('/login', { replace: true }))
+      .catch((authError) => {
+        setSubmitError(authError instanceof Error ? authError.message : 'Impossible de créer le compte.');
+      });
   };
 
   return (
@@ -34,9 +74,15 @@ const RegisterPage = () => {
           </div>
           <h1 className="text-2xl font-bold text-[#1a3c6e]">TerangaCare</h1>
           <p className="text-gray-500 text-sm text-center mt-1">
-            Créez votre compte et rejoignez notre réseau de santé.
+            Créez votre compte via Keycloak pour centraliser l'identité et les rôles.
           </p>
         </div>
+
+        {(error || submitError) && (
+          <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            {submitError || error?.message}
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-5">
           {/* Role selector */}
@@ -63,22 +109,38 @@ const RegisterPage = () => {
             </div>
           </div>
 
-          {/* Full name */}
+          {/* First and last name */}
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">Nom complet</label>
-            <div className="flex items-center border-2 border-[#c8d9ef] rounded-xl px-3 py-3 focus-within:border-[#1a3c6e] transition-colors bg-white">
-              <svg className="w-5 h-5 text-gray-400 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-              </svg>
-              <input
-                type="text"
-                name="fullName"
-                placeholder="Fatou Diallo"
-                value={form.fullName}
-                onChange={handleChange}
-                required
-                className="flex-1 outline-none text-sm text-gray-700 placeholder-gray-400 bg-transparent"
-              />
+            <label className="block text-sm font-semibold text-gray-700 mb-2">Nom</label>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div className="flex min-w-0 items-center overflow-hidden border-2 border-[#c8d9ef] rounded-xl px-3 py-3 focus-within:border-[#1a3c6e] transition-colors bg-white">
+                <svg className="w-5 h-5 text-gray-400 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                </svg>
+                <input
+                  type="text"
+                  name="firstName"
+                  placeholder="Fatou"
+                  value={form.firstName}
+                  onChange={handleChange}
+                  required
+                  className="w-full min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap outline-none text-sm text-gray-700 placeholder-gray-400 bg-transparent"
+                />
+              </div>
+              <div className="flex min-w-0 items-center overflow-hidden border-2 border-[#c8d9ef] rounded-xl px-3 py-3 focus-within:border-[#1a3c6e] transition-colors bg-white">
+                <svg className="w-5 h-5 text-gray-400 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                </svg>
+                <input
+                  type="text"
+                  name="lastName"
+                  placeholder="Diallo"
+                  value={form.lastName}
+                  onChange={handleChange}
+                  required
+                  className="w-full min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap outline-none text-sm text-gray-700 placeholder-gray-400 bg-transparent"
+                />
+              </div>
             </div>
           </div>
 
@@ -181,7 +243,7 @@ const RegisterPage = () => {
             type="submit"
             className="w-full bg-[#1a3c6e] text-white py-4 rounded-full font-semibold text-base hover:bg-[#152f58] transition-colors mt-1 shadow-md"
           >
-            Créer mon compte
+            Créer mon compte avec Keycloak
           </button>
         </form>
 

@@ -1,5 +1,3 @@
-import React from 'react';
-
 const partners = ['Labo BioSanté', 'Pharmacie Dakar', 'Clinique Espoir', 'Croix Rouge SN'];
 
 const Partners = () => {
