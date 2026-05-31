@@ -38,6 +38,7 @@ class RegisterRequest(BaseModel):
 
 class RegisterResponse(BaseModel):
     id: str | None = None
+    keycloak_sub: str | None = None
     message: str
 
 
@@ -283,7 +284,7 @@ async def register(payload: RegisterRequest) -> RegisterResponse:
 
                 assigned_role = role_name
 
-    return RegisterResponse(id=created_id, message="User created")
+    return RegisterResponse(id=None, keycloak_sub=created_id, message="User created")
 
 
 @app.get("/auth/me")
