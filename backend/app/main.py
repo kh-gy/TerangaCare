@@ -289,3 +289,4 @@ async def register(payload: RegisterRequest) -> RegisterResponse:
 @app.get("/auth/me")
 async def read_current_user(current_user=Depends(get_current_user)) -> dict[str, object]:
     return current_user.model_dump()
+
