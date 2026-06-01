@@ -1,14 +1,39 @@
-import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useState } from 'react';
+import { Link, Navigate } from 'react-router-dom';
+import { useAuth } from '../auth/useAuth';
 
 const LoginPage = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [submitError, setSubmitError] = useState('');
+  const { authenticated, error, initialized, isConfigured, login } = useAuth();
+
+  if (!initialized) {
+    return (
+      <div className="min-h-screen bg-[#eef3fa] flex items-center justify-center px-4 py-8 text-[#1a3c6e] font-semibold">
+        Initialisation de la session...
+      </div>
+    );
+  }
+
+  if (authenticated) {
+    return <Navigate to="/" replace />;
+  }
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    // TODO: connect to backend auth
+
+    if (!isConfigured) {
+      setSubmitError('La configuration de l\'API est manquante. Vérifie VITE_API_BASE_URL.');
+      return;
+    }
+
+    setSubmitError('');
+
+    void login({ email, password }).catch((authError) => {
+      setSubmitError(authError instanceof Error ? authError.message : 'Connexion impossible.');
+    });
   };
 
   return (
@@ -24,9 +49,15 @@ const LoginPage = () => {
           </div>
           <h1 className="text-2xl font-bold text-[#1a3c6e]">TerangaCare</h1>
           <p className="text-gray-500 text-sm text-center mt-1">
-            Content de vous revoir. Veuillez vous connecter pour continuer votre parcours de soins.
+            Content de vous revoir. Connectez-vous avec votre compte TerangaCare.
           </p>
         </div>
+
+        {(error || submitError) && (
+          <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            {submitError || error?.message}
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-5">
           {/* Email */}
