@@ -216,14 +216,29 @@ class Ordonnance(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     medicaments: Mapped[str] = mapped_column(Text, nullable=False)
     posologie: Mapped[str] = mapped_column(Text, nullable=False)
-    date_emission: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    statut: Mapped[str] = mapped_column(String(30), nullable=False, default="EMISE")
+    date_emission: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
     date_expiration: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     medecin_id: Mapped[int] = mapped_column(
         ForeignKey("medecins.id", ondelete="CASCADE"),
         nullable=False,
     )
+    patient_id: Mapped[int] = mapped_column(
+        ForeignKey("patients.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    teleconsultation_id: Mapped[int] = mapped_column(
+        ForeignKey("teleconsultations.id", ondelete="CASCADE"),
+        nullable=False,
+    )
 
     medecin: Mapped[Medecin] = relationship(back_populates="ordonnances")
+    patient: Mapped[Patient] = relationship()
+    teleconsultation: Mapped[Teleconsultation] = relationship()
 
 
 class Orientation(Base):

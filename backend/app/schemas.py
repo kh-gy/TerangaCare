@@ -96,14 +96,13 @@ class RendezVousConfirmResponse(BaseModel):
 # ============================================================================
 
 class CarnetSanteResponse(BaseModel):
-    """Réponse pour consulter carnet de santé"""
+    """Réponse pour consulter carnet de santé (conforme cahier des charges)"""
     id: int
-    antecedents: Optional[str]
-    allergies: Optional[str]
-    groupe_sanguin: Optional[str]
-    maladies_chroniques: Optional[str]
-    date_creation: datetime
-    date_derniere_maj: datetime
+    antecedents: List[str] = []
+    allergies: List[str] = []
+    groupeSanguin: Optional[str] = None
+    maladiesChroniques: List[str] = []
+    dateDerniereMiseAJour: datetime
 
     class Config:
         from_attributes = True
@@ -111,10 +110,10 @@ class CarnetSanteResponse(BaseModel):
 
 class CarnetSanteUpdate(BaseModel):
     """Requête pour mettre à jour le carnet de santé"""
-    antecedents: Optional[str] = None
-    allergies: Optional[str] = None
+    antecedents: Optional[List[str]] = None
+    allergies: Optional[List[str]] = None
     groupe_sanguin: Optional[str] = None
-    maladies_chroniques: Optional[str] = None
+    maladies_chroniques: Optional[List[str]] = None
 
 
 # ============================================================================
@@ -122,22 +121,19 @@ class CarnetSanteUpdate(BaseModel):
 # ============================================================================
 
 class OrdonnanceCreate(BaseModel):
-    """Requête pour créer une ordonnance"""
-    patient_id: int
-    teleconsultation_id: int
-    medicaments: str  # Liste formatée en texte
-    posologie: str  # Détails en texte
-    date_expiration: datetime
+    """Requête pour créer une ordonnance (conforme cahier des charges)"""
+    patientId: int
+    teleconsultationId: int
+    medicaments: List[str]       # Liste des produits prescrits
+    posologie: List[str]         # Détails des prises d'administration
+    dateExpiration: datetime
 
 
 class OrdonnanceResponse(BaseModel):
-    """Réponse pour ordonnance"""
+    """Réponse pour ordonnance créée"""
     id: int
-    date_emission: datetime
+    dateEmission: datetime
     statut: str = "EMISE"
-    medicaments: str
-    posologie: str
-    date_expiration: datetime
 
     class Config:
         from_attributes = True
