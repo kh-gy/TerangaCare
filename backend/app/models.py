@@ -81,6 +81,10 @@ class Patient(Utilisateur):
         back_populates="patient",
         cascade="all, delete-orphan",
     )
+    signalements: Mapped[list[Signalement]] = relationship(
+        back_populates="patient",
+        cascade="all, delete-orphan",
+    )
 
     __mapper_args__ = {"polymorphic_identity": Role.PATIENT.value}
 
@@ -106,6 +110,14 @@ class Medecin(Utilisateur):
     orientation: Mapped[Orientation | None] = relationship(
         back_populates="medecin",
         uselist=False,
+        cascade="all, delete-orphan",
+    )
+    avis_recus: Mapped[list[Avis]] = relationship(
+        back_populates="medecin",
+        cascade="all, delete-orphan",
+    )
+    signalements: Mapped[list[Signalement]] = relationship(
+        back_populates="medecin",
         cascade="all, delete-orphan",
     )
     __mapper_args__ = {"polymorphic_identity": Role.MEDECIN.value}
@@ -171,8 +183,39 @@ class Avis(Base):
         ForeignKey("patients.id", ondelete="CASCADE"),
         nullable=False,
     )
+    medecin_id: Mapped[int] = mapped_column(
+        ForeignKey("medecins.id", ondelete="CASCADE"),
+        nullable=False,
+    )
 
     patient: Mapped[Patient] = relationship(back_populates="avis")
+    medecin: Mapped[Medecin] = relationship(back_populates="avis_recus")
+
+
+class Signalement(Base):
+    """Signalement d'un litige à traiter par l'administrateur."""
+
+    __tablename__ = "signalements"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    motif: Mapped[str] = mapped_column(Text, nullable=False)
+    date_signalement: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+    statut: Mapped[str] = mapped_column(String(30), default="EN_ATTENTE", nullable=False)
+    patient_id: Mapped[int] = mapped_column(
+        ForeignKey("patients.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    medecin_id: Mapped[int] = mapped_column(
+        ForeignKey("medecins.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+
+    patient: Mapped[Patient] = relationship(back_populates="signalements")
+    medecin: Mapped[Medecin] = relationship(back_populates="signalements")
 
 
 class RendezVous(Base):

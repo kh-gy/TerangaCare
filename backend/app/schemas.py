@@ -1,6 +1,6 @@
 """Schémas — Validation des requêtes/réponses pour l'API TerangaCare."""
 
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field
 from datetime import datetime
 from decimal import Decimal
 from typing import Optional, List
@@ -144,7 +144,7 @@ class OrdonnanceResponse(BaseModel):
 
 
 # ============================================================================
-# AVIS
+# AVIS & SIGNALEMENTS
 # ============================================================================
 
 class AvisCreate(BaseModel):
@@ -152,6 +152,17 @@ class AvisCreate(BaseModel):
     medecin_id: int
     note: int  # 1-5
     commentaire: Optional[str] = None
+
+
+class AvisMedecinCreate(BaseModel):
+    """Requête POST /medecins/{id}/avis"""
+    note: int = Field(ge=1, le=5)
+    commentaire: Optional[str] = None
+
+
+class AvisCreateResponse(BaseModel):
+    """Réponse HTTP 201 — création d'un avis"""
+    idAvis: int
 
 
 class AvisResponse(BaseModel):
@@ -163,6 +174,13 @@ class AvisResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class SignalementResponse(BaseModel):
+    """Réponse GET /admin/signalements"""
+    patientId: int
+    medecinId: int
+    motif: str
 
 
 # ============================================================================
