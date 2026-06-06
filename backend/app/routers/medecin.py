@@ -170,3 +170,7 @@ def update_tarif(
         "tarif_consultation": medecin.tarif_consultation,
         "statut": "Mis à jour"
     }
+
+# ===== PATCH /api/v1/medecins/admin/{id}/valider =====
+# [NOUVEAU MVP V2]
+# à revoir

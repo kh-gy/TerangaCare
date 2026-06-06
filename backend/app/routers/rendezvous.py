@@ -1,6 +1,6 @@
 """Router pour la gestion des rendez-vous """
 
-from fastapi import APIRouter, HTTPException, status, Depends
+from fastapi import APIRouter, HTTPException, status, Depends, Query
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
 from datetime import datetime, timezone
@@ -50,10 +50,11 @@ def get_current_user(
     return user
 
 # ===== GET /api/v1/rendezvous/mes-rendez-vous =====
+# ici le médecin voie ses RDV en attente de confirmation
 
 @router.get("/mes-rendez-vous", response_model=list[RendezVousResponse])
 def get_my_rendezvous(
-    authorization: str = None,
+    current_user: Utilisateur = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
@@ -66,17 +67,14 @@ def get_my_rendezvous(
     - Liste des rendez-vous du médecin avec statut "EN_ATTENTE"
     """
     
-    # 1. Vérifier l'authentification
-    current_user = get_current_user(authorization, db)
-    
-    # 2. Vérifier que c'est un médecin
+    # 1. Vérifier que c'est un médecin
     if current_user.role != "medecin":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Seuls les médecins peuvent accéder à leurs rendez-vous"
         )
     
-    # 3. Récupérer le médecin
+    # 2. Récupérer le médecin
     medecin = db.query(Medecin).filter(Medecin.id == current_user.id).first()
     if not medecin:
         raise HTTPException(
@@ -84,13 +82,13 @@ def get_my_rendezvous(
             detail="Profil médecin non trouvé"
         )
     
-    # 4. Récupérer SEULEMENT ses rendez-vous en attente
+    # 3. Récupérer SEULEMENT ses rendez-vous en attente
     mes_rendez_vous = db.query(RendezVous).filter(
         RendezVous.medecin_id == current_user.id,
         RendezVous.statut == "EN_ATTENTE"
     ).all()
     
-    # 5. Retourner la liste
+    # 4. Retourner la liste
     return mes_rendez_vous
 
 # ===== POST /api/v1/rendezvous =====
@@ -211,6 +209,77 @@ def confirm_rendezvous(
     db.refresh(rendezvous)
     
     # 6. Retourner la réponse
+    return {
+        "id": rendezvous.id,
+        "statut": rendezvous.statut
+    }
+
+# ===== PATCH /api/v1/rendezvous/{id}/cancel =====
+
+@router.patch("/{rendezvous_id}/cancel", response_model=RendezVousConfirmResponse)
+def cancel_rendezvous(
+    rendezvous_id: int,
+    motif_annulation: str = Query(
+        None,
+        description="Raison de l'annulation (optionnel)"
+    ),
+    current_user: Utilisateur = Depends(get_current_user), 
+    db: Session = Depends(get_db)
+):
+    """
+    Annulation d'une réservation de rendez-vous.
+    """
+    
+    # 1. Récupérer le rendez-vous
+    rendezvous = db.query(RendezVous).filter(
+        RendezVous.id == rendezvous_id
+    ).first()
+    
+    if not rendezvous:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Rendez-vous avec l'ID {rendezvous_id} non trouvé"
+        )
+    
+    # 2. Vérifier l'autorisation (patient ou médecin du RDV)
+    role_user = current_user.role.upper()
+    
+    if role_user == "PATIENT":
+        if rendezvous.patient_id != current_user.id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Vous ne pouvez annuler que vos propres rendez-vous"
+            )
+    elif role_user == "MEDECIN":
+        if rendezvous.medecin_id != current_user.id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Vous ne pouvez annuler que vos propres rendez-vous"
+            )
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Seuls les patients et médecins peuvent annuler un rendez-vous"
+        )
+    
+    # 3. Vérifier que le rendez-vous n'est pas déjà terminé/annulé
+    if rendezvous.statut in ["TERMINE", "ANNULE"]:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Ce rendez-vous a déjà un statut '{rendezvous.statut}' et ne peut pas être annulé"
+        )
+    
+    # 4. Mettre à jour le statut (et éventuellement le motif)
+    rendezvous.statut = "ANNULE"
+    
+    if motif_annulation:
+        # Optionnel : Concaténer l'annulation au motif initial si besoin de garder une trace
+        motif_actuel = rendezvous.motif or "Aucun motif initial"
+        rendezvous.motif = f"{motif_actuel} | Annulé car : {motif_annulation}"
+
+    db.commit()
+    db.refresh(rendezvous)
+    
     return {
         "id": rendezvous.id,
         "statut": rendezvous.statut
