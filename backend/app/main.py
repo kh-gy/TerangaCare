@@ -12,6 +12,8 @@ from app.settings import get_settings
 from app.routers import avis
 from app.routers import medecins
 from app.routers import rendezvous
+from app.routers import patients
+from app.routers import ordonnances
 
 settings = get_settings()
 logger = logging.getLogger(__name__)
@@ -42,6 +44,7 @@ class RegisterRequest(BaseModel):
 
 class RegisterResponse(BaseModel):
     id: str | None = None
+    keycloak_sub: str | None = None
     message: str
 
 
@@ -287,7 +290,7 @@ async def register(payload: RegisterRequest) -> RegisterResponse:
 
                 assigned_role = role_name
 
-    return RegisterResponse(id=created_id, message="User created")
+    return RegisterResponse(id=None, keycloak_sub=created_id, message="User created")
 
 
 @app.get("/auth/me")
@@ -299,11 +302,11 @@ async def read_current_user(current_user=Depends(get_current_user)) -> dict[str,
 app.include_router(medecins.router)
 app.include_router(rendezvous.router)
 app.include_router(avis.router)
+app.include_router(patients.router)
+app.include_router(ordonnances.router)
 
 #à compléter
 # app.include_router(auth.router)
-# app.include_router(patients.router)
-# app.include_router(ordonnances.router)
 # app.include_router(paiements.router)
 # app.include_router(teleconsultations.router)
 
