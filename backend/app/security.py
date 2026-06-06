@@ -90,6 +90,14 @@ async def decode_access_token(token: str, settings: Settings) -> TokenUser:
     )
 
 
+def verify_token(token: str) -> dict[str, Any] | None:
+    """Décode un JWT et retourne le payload (user_id attendu par les routers métiers)."""
+    try:
+        return jwt.get_unverified_claims(token)
+    except JWTError:
+        return None
+
+
 async def get_current_user(
     credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
     settings: Settings = Depends(get_settings),

@@ -9,6 +9,7 @@ from pydantic import BaseModel
 from app.security import decode_access_token, get_current_user
 from app.settings import get_settings
 
+from app.routers import avis
 from app.routers import medecins
 from app.routers import rendezvous
 
@@ -297,6 +298,7 @@ async def read_current_user(current_user=Depends(get_current_user)) -> dict[str,
 
 app.include_router(medecins.router)
 app.include_router(rendezvous.router)
+app.include_router(avis.router)
 
 #à compléter
 # app.include_router(auth.router)
