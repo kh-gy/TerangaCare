@@ -5,6 +5,7 @@ from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
 from datetime import datetime, timezone
 from app.database import get_db
+from app.dev_auth import resolve_demo_user
 from app.models import RendezVous, Patient, Medecin, Utilisateur
 from app.schemas import (
     RendezVousCreate,
@@ -12,9 +13,11 @@ from app.schemas import (
     RendezVousConfirmResponse
 )
 from app.security import verify_token
+from app.settings import get_settings
 
 
 router = APIRouter(prefix="/api/v1/rendezvous", tags=["rendez_vous"])
+settings = get_settings()
 
 # ===== CONFIGURATION OAUTH2 =====
 # Le tokenUrl indique à Swagger UI où envoyer les identifiants pour récupérer un token de test
@@ -27,6 +30,9 @@ def get_current_user(
     db: Session = Depends(get_db)
 ):
     """Extraire l'utilisateur depuis le JWT token géré par OAuth2PasswordBearer"""
+
+    if settings.auth_disabled:
+        return resolve_demo_user(db, "medecin")
     
     payload = verify_token(token)
     
@@ -47,6 +53,35 @@ def get_current_user(
             headers={"WWW-Authenticate": "Bearer"},
         )
     
+    return user
+
+
+def get_current_patient(
+    token: str = Depends(oauth2_scheme),
+    db: Session = Depends(get_db),
+):
+    if settings.auth_disabled:
+        return resolve_demo_user(db, "patient")
+
+    payload = verify_token(token)
+
+    if not payload:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token invalide ou expiré",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    user_id = payload.get("user_id")
+    user = db.query(Utilisateur).filter(Utilisateur.id == user_id).first()
+
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Utilisateur non trouvé",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
     return user
 
 # ===== GET /api/v1/rendezvous/mes-rendez-vous =====
@@ -70,7 +105,7 @@ def get_my_rendezvous(
     current_user = get_current_user(authorization, db)
     
     # 2. Vérifier que c'est un médecin
-    if current_user.role != "medecin":
+    if not settings.auth_disabled and current_user.role != "medecin":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Seuls les médecins peuvent accéder à leurs rendez-vous"
@@ -98,7 +133,7 @@ def get_my_rendezvous(
 @router.post("", response_model=RendezVousResponse, status_code=201)
 def create_rendezvous(
     request: RendezVousCreate,
-    current_user: Utilisateur = Depends(get_current_user), # Injection directe de l'utilisateur
+    current_user: Utilisateur = Depends(get_current_patient), # Injection directe de l'utilisateur
     db: Session = Depends(get_db)
 ):
     """
@@ -106,7 +141,7 @@ def create_rendezvous(
     """
     
     # 1. Vérifier que c'est un patient 
-    if current_user.role.upper() != "PATIENT":
+    if not settings.auth_disabled and current_user.role.upper() != "PATIENT":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Seuls les patients peuvent prendre un rendez-vous"
@@ -174,7 +209,7 @@ def confirm_rendezvous(
     """
     
     # 1. Vérifier que c'est un médecin
-    if current_user.role.upper() != "MEDECIN":
+    if not settings.auth_disabled and current_user.role.upper() != "MEDECIN":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Seuls les médecins peuvent confirmer un rendez-vous"
@@ -192,7 +227,7 @@ def confirm_rendezvous(
         )
     
     # 3. Vérifier que le rendez-vous appartient au médecin authentifié
-    if rendezvous.medecin_id != current_user.id:
+    if not settings.auth_disabled and rendezvous.medecin_id != current_user.id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Vous ne pouvez confirmer que vos propres rendez-vous"

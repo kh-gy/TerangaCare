@@ -8,9 +8,9 @@ from app.settings import settings
 
 # Créer le moteur SQLAlchemy
 engine = create_engine(
-    settings.DATABASE_URL,
+    settings.database_url,
     # Options spécifiques selon le type de BDD
-    connect_args={"check_same_thread": False} if "sqlite" in settings.DATABASE_URL else {},
+    connect_args={"check_same_thread": False} if "sqlite" in settings.database_url else {},
     # Pool de connexions
     pool_pre_ping=True,  # Vérifie la connexion avant de l'utiliser
     echo=False,  # Mettre à True pour déboguer les requêtes SQL

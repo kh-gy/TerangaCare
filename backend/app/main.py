@@ -6,10 +6,11 @@ from fastapi import Depends, FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
+from app.dev_auth import build_dev_token_user
 from app.security import decode_access_token, get_current_user
 from app.settings import get_settings
 
-from app.routers import medecins
+from app.routers import medecin
 from app.routers import rendezvous
 from app.routers import patients
 from app.routers import ordonnances
@@ -63,6 +64,14 @@ async def health() -> dict[str, str]:
 
 @app.post("/auth/login", response_model=LoginResponse)
 async def login(payload: LoginRequest) -> LoginResponse:
+    if settings.auth_disabled:
+        dev_user = build_dev_token_user(settings)
+        return LoginResponse(
+            access_token="dev-access-token",
+            token_type="Bearer",
+            user=dev_user.model_dump(),
+        )
+
     form_data = {
         "grant_type": "password",
         "client_id": settings.keycloak_client_id,
@@ -100,6 +109,13 @@ async def login(payload: LoginRequest) -> LoginResponse:
 
 @app.post("/auth/register", response_model=RegisterResponse, status_code=201)
 async def register(payload: RegisterRequest) -> RegisterResponse:
+    if settings.auth_disabled:
+        return RegisterResponse(
+            id=None,
+            keycloak_sub="dev-auth-user",
+            message="User created in development mode",
+        )
+
     # basic validation
     if not payload.email or not payload.password:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Email and password are required")
@@ -298,7 +314,7 @@ async def read_current_user(current_user=Depends(get_current_user)) -> dict[str,
 
 # --- Import des routes métiers ---
 
-app.include_router(medecins.router)
+app.include_router(medecin.router)
 app.include_router(rendezvous.router)
 app.include_router(patients.router)
 app.include_router(ordonnances.router)

@@ -4,6 +4,7 @@ from fastapi import APIRouter, HTTPException, status, Depends, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import and_
 from app.database import get_db
+from app.dev_auth import resolve_demo_user
 from app.models import Medecin, Utilisateur
 from app.schemas import (
     MedecinSearch,
@@ -11,8 +12,10 @@ from app.schemas import (
     TarifUpdateResponse
 )
 from app.security import verify_token
+from app.settings import get_settings
 
 router = APIRouter(prefix="/api/v1/medecins", tags=["medecins"])
+settings = get_settings()
 
 
 # ===== Obtenir l'utilisateur depuis le JWT =====
@@ -22,6 +25,9 @@ def get_current_user(
     db: Session = Depends(get_db)
 ):
     """Extraire l'utilisateur depuis le JWT token (Authorization header)"""
+
+    if settings.auth_disabled:
+        return resolve_demo_user(db, "medecin")
     
     if not authorization:
         raise HTTPException(
@@ -139,12 +145,12 @@ def update_tarif(
     
     # 2. Vérifier l'autorisation
     # Un médecin ne peut modifier que son propre tarif (sauf s'il est admin)
-    if current_user.role == "medecin" and current_user.id != medecin_id:
+    if not settings.auth_disabled and current_user.role == "medecin" and current_user.id != medecin_id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Vous ne pouvez modifier que votre propre tarif"
         )
-    elif current_user.role not in ["medecin", "administrateur"]:
+    elif not settings.auth_disabled and current_user.role not in ["medecin", "administrateur"]:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Seuls les médecins et administrateurs peuvent modifier les tarifs"

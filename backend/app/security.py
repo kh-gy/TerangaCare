@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import time
 from typing import Any
 
@@ -9,6 +10,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import jwt
 from jose.exceptions import JWTError
 
+from app.dev_auth import build_dev_token_user
 from app.schemas import TokenUser
 from app.settings import Settings, get_settings
 
@@ -33,6 +35,22 @@ async def get_jwks(settings: Settings) -> dict[str, Any]:
     return jwks
 
 
+def get_jwks_sync(settings: Settings) -> dict[str, Any]:
+    now = time.time()
+    cached_value = _JWKS_CACHE["value"]
+    if cached_value is not None and now < _JWKS_CACHE["expires_at"]:
+        return cached_value
+
+    with httpx.Client(timeout=10.0) as client:
+        response = client.get(settings.jwks_url)
+        response.raise_for_status()
+        jwks = response.json()
+
+    _JWKS_CACHE["value"] = jwks
+    _JWKS_CACHE["expires_at"] = now + _JWKS_TTL_SECONDS
+    return jwks
+
+
 def _extract_roles(claims: dict[str, Any], client_id: str | None) -> list[str]:
     roles: set[str] = set()
 
@@ -41,15 +59,14 @@ def _extract_roles(claims: dict[str, Any], client_id: str | None) -> list[str]:
 
     resource_access = claims.get("resource_access") or {}
     if client_id:
-      client_access = resource_access.get(client_id) or {}
-      roles.update(client_access.get("roles") or [])
+        client_access = resource_access.get(client_id) or {}
+        roles.update(client_access.get("roles") or [])
 
     return sorted(roles)
 
 
-async def decode_access_token(token: str, settings: Settings) -> TokenUser:
+def _decode_with_jwks(token: str, settings: Settings, jwks: dict[str, Any]) -> dict[str, Any]:
     headers = jwt.get_unverified_header(token)
-    jwks = await get_jwks(settings)
     key_data = next((key for key in jwks.get("keys", []) if key.get("kid") == headers.get("kid")), None)
 
     if key_data is None:
@@ -61,7 +78,7 @@ async def decode_access_token(token: str, settings: Settings) -> TokenUser:
 
     options = {"verify_aud": settings.keycloak_audience is not None}
     if settings.keycloak_audience:
-        decoded = jwt.decode(
+        return jwt.decode(
             token,
             key_data,
             algorithms=[headers.get("alg", "RS256")],
@@ -69,15 +86,17 @@ async def decode_access_token(token: str, settings: Settings) -> TokenUser:
             issuer=settings.issuer,
             options=options,
         )
-    else:
-        decoded = jwt.decode(
-            token,
-            key_data,
-            algorithms=[headers.get("alg", "RS256")],
-            issuer=settings.issuer,
-            options=options,
-        )
 
+    return jwt.decode(
+        token,
+        key_data,
+        algorithms=[headers.get("alg", "RS256")],
+        issuer=settings.issuer,
+        options=options,
+    )
+
+
+def _build_token_user(decoded: dict[str, Any], settings: Settings) -> TokenUser:
     return TokenUser(
         sub=decoded["sub"],
         email=decoded.get("email"),
@@ -90,10 +109,37 @@ async def decode_access_token(token: str, settings: Settings) -> TokenUser:
     )
 
 
+async def decode_access_token(token: str, settings: Settings) -> TokenUser:
+    if settings.auth_disabled:
+        return build_dev_token_user(settings)
+
+    decoded = _decode_with_jwks(token, settings, await get_jwks(settings))
+    return _build_token_user(decoded, settings)
+
+
+def verify_token(token: str, settings: Settings | None = None) -> dict[str, Any] | None:
+    settings = settings or get_settings()
+
+    if settings.auth_disabled:
+        return {
+            "user_id": int(os.getenv("DEV_AUTH_USER_ID", "1")),
+            "role": os.getenv("DEV_AUTH_ROLE", "administrateur"),
+            "email": os.getenv("DEV_AUTH_EMAIL", "dev@terangacare.local"),
+        }
+
+    try:
+        return _decode_with_jwks(token, settings, get_jwks_sync(settings))
+    except (JWTError, ValueError, httpx.HTTPError):
+        return None
+
+
 async def get_current_user(
     credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
     settings: Settings = Depends(get_settings),
 ) -> TokenUser:
+    if settings.auth_disabled:
+        return build_dev_token_user(settings)
+
     if credentials is None or credentials.scheme.lower() != "bearer":
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

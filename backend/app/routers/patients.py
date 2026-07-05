@@ -6,11 +6,14 @@ from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
 
 from app.database import get_db
+from app.dev_auth import resolve_demo_user
 from app.models import CarnetSante, Patient, Utilisateur
 from app.schemas import CarnetSanteResponse
 from app.security import verify_token
+from app.settings import get_settings
 
 router = APIRouter(prefix="/api/v1/patients", tags=["patients"])
+settings = get_settings()
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
 
@@ -22,6 +25,9 @@ def get_current_user(
     db: Session = Depends(get_db),
 ) -> Utilisateur:
     """Extraire l'utilisateur authentifié depuis le token JWT."""
+    if settings.auth_disabled:
+        return resolve_demo_user(db, "patient")
+
     payload = verify_token(token)
     if not payload:
         raise HTTPException(
@@ -77,7 +83,7 @@ def get_carnet_sante(
     role = current_user.role.lower()
 
     # Contrôle d'accès : le patient ne peut voir que son propre carnet
-    if role == "patient" and current_user.id != patient_id:
+    if not settings.auth_disabled and role == "patient" and current_user.id != patient_id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Vous ne pouvez consulter que votre propre carnet de santé",

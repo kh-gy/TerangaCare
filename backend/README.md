@@ -9,6 +9,7 @@ Backend FastAPI de TerangaCare avec validation des tokens Keycloak.
 - `KEYCLOAK_REALM`
 - `KEYCLOAK_AUDIENCE` (optionnel si le token vient directement du client frontend)
 - `CORS_ORIGINS`
+- `APP_ENV=development` pour désactiver l'authentification en local
 
 ## Lancer l'API
 

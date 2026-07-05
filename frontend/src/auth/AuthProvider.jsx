@@ -1,15 +1,29 @@
 import { useEffect, useMemo, useState } from 'react';
 import { AuthContext } from './authContext';
-import { authTokenKey, fetchCurrentUser, getApiBaseUrl, loginWithCredentials, registerWithCredentials } from './authApi';
+import { authTokenKey, fetchCurrentUser, getApiBaseUrl, isAuthDisabled, loginWithCredentials, registerWithCredentials } from './authApi';
 
 export const AuthProvider = ({ children }) => {
-  const [initialized, setInitialized] = useState(() => !localStorage.getItem(authTokenKey));
-  const [authenticated, setAuthenticated] = useState(false);
+  const [initialized, setInitialized] = useState(() => isAuthDisabled() || !localStorage.getItem(authTokenKey));
+  const [authenticated, setAuthenticated] = useState(() => isAuthDisabled());
   const [profile, setProfile] = useState(null);
   const [error, setError] = useState(null);
-  const [accessToken, setAccessToken] = useState(() => localStorage.getItem(authTokenKey));
+  const [accessToken, setAccessToken] = useState(() => (isAuthDisabled() ? 'dev-access-token' : localStorage.getItem(authTokenKey)));
 
   useEffect(() => {
+    if (isAuthDisabled()) {
+      setAuthenticated(true);
+      setProfile({
+        sub: 'dev-auth-user',
+        email: 'dev@terangacare.local',
+        given_name: 'Teranga',
+        family_name: 'Care',
+        preferred_username: 'dev',
+        roles: ['administrateur'],
+      });
+      setInitialized(true);
+      return undefined;
+    }
+
     let active = true;
 
     if (!accessToken) {
@@ -47,7 +61,9 @@ export const AuthProvider = ({ children }) => {
     const payload = await loginWithCredentials(email, password);
     const nextToken = payload.access_token;
 
-    localStorage.setItem(authTokenKey, nextToken);
+    if (!isAuthDisabled()) {
+      localStorage.setItem(authTokenKey, nextToken);
+    }
     setAccessToken(nextToken);
     setAuthenticated(true);
     setProfile(payload.user ?? null);
@@ -63,7 +79,9 @@ export const AuthProvider = ({ children }) => {
   };
 
   const logout = () => {
-    localStorage.removeItem(authTokenKey);
+    if (!isAuthDisabled()) {
+      localStorage.removeItem(authTokenKey);
+    }
     setAccessToken(null);
     setAuthenticated(false);
     setProfile(null);
@@ -77,6 +95,7 @@ export const AuthProvider = ({ children }) => {
       error,
       initialized,
       isConfigured: Boolean(getApiBaseUrl()),
+      isAuthDisabled: isAuthDisabled(),
       login,
       logout,
       profile,

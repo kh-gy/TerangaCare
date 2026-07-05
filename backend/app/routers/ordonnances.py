@@ -8,11 +8,14 @@ from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
 
 from app.database import get_db
+from app.dev_auth import resolve_demo_user
 from app.models import Medecin, Ordonnance, Patient, Teleconsultation, Utilisateur
 from app.schemas import OrdonnanceCreate, OrdonnanceResponse
 from app.security import verify_token
+from app.settings import get_settings
 
 router = APIRouter(prefix="/api/v1/ordonnances", tags=["ordonnances"])
+settings = get_settings()
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
 
@@ -24,6 +27,9 @@ def get_current_user(
     db: Session = Depends(get_db),
 ) -> Utilisateur:
     """Extraire l'utilisateur authentifié depuis le token JWT."""
+    if settings.auth_disabled:
+        return resolve_demo_user(db, "medecin")
+
     payload = verify_token(token)
     if not payload:
         raise HTTPException(
@@ -66,7 +72,7 @@ def create_ordonnance(
     """
 
     # 1. Vérifier que l'utilisateur est un médecin
-    if current_user.role.lower() != "medecin":
+    if not settings.auth_disabled and current_user.role.lower() != "medecin":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Seuls les médecins peuvent émettre une ordonnance",

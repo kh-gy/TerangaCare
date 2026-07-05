@@ -17,12 +17,21 @@ class Settings:
         "DATABASE_URL",
         "mysql+pymysql://root:root@localhost:3306/terangacare",
     )
+    app_env: str = os.getenv("APP_ENV", "development").strip().lower()
     keycloak_server_url: str = os.getenv("KEYCLOAK_SERVER_URL", "https://api.cybibff.site:9443")
     keycloak_realm: str = os.getenv("KEYCLOAK_REALM", "terangacare")
     keycloak_client_id: str = os.getenv("KEYCLOAK_CLIENT_ID", "terangacare-frontend")
     keycloak_client_secret: str | None = os.getenv("KEYCLOAK_CLIENT_SECRET") or None
     keycloak_audience: str | None = os.getenv("KEYCLOAK_AUDIENCE") or None
     cors_origins: str = os.getenv("CORS_ORIGINS", "http://localhost:5173")
+
+    @property
+    def is_development(self) -> bool:
+        return self.app_env != "production"
+
+    @property
+    def auth_disabled(self) -> bool:
+        return self.is_development
 
     @property
     def issuer(self) -> str:
@@ -44,3 +53,6 @@ class Settings:
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:
     return Settings()
+
+
+settings = get_settings()
