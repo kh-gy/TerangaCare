@@ -18,11 +18,11 @@ class Settings:
         "mysql+pymysql://root:root@localhost:3306/terangacare",
     )
     app_env: str = os.getenv("APP_ENV", "development").strip().lower()
-    keycloak_server_url: str = os.getenv("KEYCLOAK_SERVER_URL", "https://api.cybibff.site:9443")
-    keycloak_realm: str = os.getenv("KEYCLOAK_REALM", "terangacare")
-    keycloak_client_id: str = os.getenv("KEYCLOAK_CLIENT_ID", "terangacare-frontend")
-    keycloak_client_secret: str | None = os.getenv("KEYCLOAK_CLIENT_SECRET") or None
-    keycloak_audience: str | None = os.getenv("KEYCLOAK_AUDIENCE") or None
+    jwt_secret_key: str = os.getenv("JWT_SECRET_KEY", "change-me-in-production")
+    jwt_algorithm: str = os.getenv("JWT_ALGORITHM", "HS256")
+    jwt_issuer: str = os.getenv("JWT_ISSUER", "terangacare-api")
+    jwt_audience: str = os.getenv("JWT_AUDIENCE", "terangacare-web")
+    access_token_expire_minutes: int = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "60"))
     cors_origins: str = os.getenv("CORS_ORIGINS", "http://localhost:5173")
 
     @property
@@ -32,18 +32,6 @@ class Settings:
     @property
     def auth_disabled(self) -> bool:
         return self.is_development
-
-    @property
-    def issuer(self) -> str:
-        return f"{self.keycloak_server_url.rstrip('/')}/realms/{self.keycloak_realm}"
-
-    @property
-    def jwks_url(self) -> str:
-        return f"{self.issuer}/protocol/openid-connect/certs"
-
-    @property
-    def token_url(self) -> str:
-        return f"{self.issuer}/protocol/openid-connect/token"
 
     @property
     def cors_origin_list(self) -> List[str]:

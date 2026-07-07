@@ -1,6 +1,6 @@
 """Router pour la gestion des rendez-vous """
 
-from fastapi import APIRouter, HTTPException, status, Depends
+from fastapi import APIRouter, HTTPException, status, Depends, Header
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
 from datetime import datetime, timezone
@@ -88,7 +88,7 @@ def get_current_patient(
 
 @router.get("/mes-rendez-vous", response_model=list[RendezVousResponse])
 def get_my_rendezvous(
-    authorization: str = None,
+    authorization: str | None = Header(None),
     db: Session = Depends(get_db)
 ):
     """

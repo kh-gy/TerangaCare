@@ -3,8 +3,8 @@
 from typing import Generator
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, Session
-from sqlalchemy.ext.declarative import declarative_base
 from app.settings import settings
+from app.models import Base
 
 # Créer le moteur SQLAlchemy
 engine = create_engine(
@@ -19,8 +19,10 @@ engine = create_engine(
 # Créer la session
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
-# Base déclarative (pour les modèles)
-Base = declarative_base()
+
+def init_db() -> None:
+    """Créer les tables manquantes à partir des modèles SQLAlchemy."""
+    Base.metadata.create_all(bind=engine)
 
 
 # ===== Dépendance FastAPI =====

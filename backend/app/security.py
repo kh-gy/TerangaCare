@@ -1,119 +1,138 @@
 from __future__ import annotations
 
-import os
-import time
+from datetime import datetime, timedelta, timezone
+import hashlib
+import hmac
+import secrets
 from typing import Any
 
-import httpx
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from jose import jwt
-from jose.exceptions import JWTError
+from jose import JWTError, jwt
 
-from app.dev_auth import build_dev_token_user
+from app.models import Utilisateur
 from app.schemas import TokenUser
 from app.settings import Settings, get_settings
 
 bearer_scheme = HTTPBearer(auto_error=False)
-_JWKS_CACHE: dict[str, Any] = {"expires_at": 0.0, "value": None}
-_JWKS_TTL_SECONDS = 300
+PASSWORD_HASH_PREFIX = "pbkdf2_sha256"
+PASSWORD_HASH_ITERATIONS = 200_000
 
 
-async def get_jwks(settings: Settings) -> dict[str, Any]:
-    now = time.time()
-    cached_value = _JWKS_CACHE["value"]
-    if cached_value is not None and now < _JWKS_CACHE["expires_at"]:
-        return cached_value
-
-    async with httpx.AsyncClient(timeout=10.0) as client:
-        response = await client.get(settings.jwks_url)
-        response.raise_for_status()
-        jwks = response.json()
-
-    _JWKS_CACHE["value"] = jwks
-    _JWKS_CACHE["expires_at"] = now + _JWKS_TTL_SECONDS
-    return jwks
+def hash_password(password: str, iterations: int = PASSWORD_HASH_ITERATIONS) -> str:
+    salt = secrets.token_hex(16)
+    digest = hashlib.pbkdf2_hmac(
+        "sha256",
+        password.encode("utf-8"),
+        salt.encode("utf-8"),
+        iterations,
+    ).hex()
+    return f"{PASSWORD_HASH_PREFIX}${iterations}${salt}${digest}"
 
 
-def get_jwks_sync(settings: Settings) -> dict[str, Any]:
-    now = time.time()
-    cached_value = _JWKS_CACHE["value"]
-    if cached_value is not None and now < _JWKS_CACHE["expires_at"]:
-        return cached_value
+def verify_password(plain_password: str, stored_password: str) -> bool:
+    if stored_password.startswith(f"{PASSWORD_HASH_PREFIX}$"):
+        try:
+            _, iterations_text, salt, expected_digest = stored_password.split("$", 3)
+            derived_digest = hashlib.pbkdf2_hmac(
+                "sha256",
+                plain_password.encode("utf-8"),
+                salt.encode("utf-8"),
+                int(iterations_text),
+            ).hex()
+            return hmac.compare_digest(derived_digest, expected_digest)
+        except (TypeError, ValueError):
+            return False
 
-    with httpx.Client(timeout=10.0) as client:
-        response = client.get(settings.jwks_url)
-        response.raise_for_status()
-        jwks = response.json()
-
-    _JWKS_CACHE["value"] = jwks
-    _JWKS_CACHE["expires_at"] = now + _JWKS_TTL_SECONDS
-    return jwks
-
-
-def _extract_roles(claims: dict[str, Any], client_id: str | None) -> list[str]:
-    roles: set[str] = set()
-
-    realm_access = claims.get("realm_access") or {}
-    roles.update(realm_access.get("roles") or [])
-
-    resource_access = claims.get("resource_access") or {}
-    if client_id:
-        client_access = resource_access.get(client_id) or {}
-        roles.update(client_access.get("roles") or [])
-
-    return sorted(roles)
+    return hmac.compare_digest(plain_password, stored_password)
 
 
-def _decode_with_jwks(token: str, settings: Settings, jwks: dict[str, Any]) -> dict[str, Any]:
-    headers = jwt.get_unverified_header(token)
-    key_data = next((key for key in jwks.get("keys", []) if key.get("kid") == headers.get("kid")), None)
+def build_access_token_payload(user: Utilisateur, settings: Settings, expires_delta: timedelta | None = None) -> dict[str, Any]:
+    now = datetime.now(timezone.utc)
+    expires_at = now + (expires_delta or timedelta(minutes=settings.access_token_expire_minutes))
+    role = (user.role or "").lower()
+    return {
+        "sub": str(user.id),
+        "user_id": user.id,
+        "email": user.email,
+        "given_name": user.prenom,
+        "family_name": user.nom,
+        "preferred_username": user.email,
+        "role": role,
+        "roles": [role] if role else [],
+        "iat": int(now.timestamp()),
+        "exp": int(expires_at.timestamp()),
+        "iss": settings.jwt_issuer,
+        "aud": settings.jwt_audience,
+    }
 
-    if key_data is None:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Unknown token key",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
 
-    options = {"verify_aud": settings.keycloak_audience is not None}
-    if settings.keycloak_audience:
-        return jwt.decode(
-            token,
-            key_data,
-            algorithms=[headers.get("alg", "RS256")],
-            audience=settings.keycloak_audience,
-            issuer=settings.issuer,
-            options=options,
-        )
+def create_access_token(user: Utilisateur, settings: Settings, expires_delta: timedelta | None = None) -> str:
+    payload = build_access_token_payload(user, settings, expires_delta)
+    return jwt.encode(payload, settings.jwt_secret_key, algorithm=settings.jwt_algorithm)
 
+
+def build_token_user_from_user(user: Utilisateur, settings: Settings) -> TokenUser:
+    role = (user.role or "").lower()
+    return TokenUser(
+        sub=str(user.id),
+        user_id=user.id,
+        email=user.email,
+        given_name=user.prenom,
+        family_name=user.nom,
+        preferred_username=user.email,
+        role=role or None,
+        roles=[role] if role else [],
+        issuer=settings.jwt_issuer,
+        audience=settings.jwt_audience,
+    )
+
+
+def _decode_token(token: str, settings: Settings) -> dict[str, Any]:
+    options = {
+        "verify_aud": bool(settings.jwt_audience),
+        "verify_iss": bool(settings.jwt_issuer),
+    }
     return jwt.decode(
         token,
-        key_data,
-        algorithms=[headers.get("alg", "RS256")],
-        issuer=settings.issuer,
+        settings.jwt_secret_key,
+        algorithms=[settings.jwt_algorithm],
+        audience=settings.jwt_audience,
+        issuer=settings.jwt_issuer,
         options=options,
     )
 
 
 def _build_token_user(decoded: dict[str, Any], settings: Settings) -> TokenUser:
+    roles = decoded.get("roles") or []
+    if isinstance(roles, str):
+        roles = [roles]
+
+    user_id = decoded.get("user_id")
+    if user_id is None:
+        user_id = int(decoded["sub"])
+
     return TokenUser(
-        sub=decoded["sub"],
+        sub=str(decoded.get("sub", user_id)),
+        user_id=int(user_id),
         email=decoded.get("email"),
         given_name=decoded.get("given_name"),
         family_name=decoded.get("family_name"),
         preferred_username=decoded.get("preferred_username"),
-        roles=_extract_roles(decoded, settings.keycloak_audience),
-        issuer=decoded.get("iss", settings.issuer),
-        audience=decoded.get("aud"),
+        role=decoded.get("role"),
+        roles=[str(role) for role in roles],
+        issuer=decoded.get("iss", settings.jwt_issuer),
+        audience=decoded.get("aud", settings.jwt_audience),
     )
 
 
 async def decode_access_token(token: str, settings: Settings) -> TokenUser:
     if settings.auth_disabled:
+        from app.dev_auth import build_dev_token_user
+
         return build_dev_token_user(settings)
 
-    decoded = _decode_with_jwks(token, settings, await get_jwks(settings))
+    decoded = _decode_token(token, settings)
     return _build_token_user(decoded, settings)
 
 
@@ -122,14 +141,18 @@ def verify_token(token: str, settings: Settings | None = None) -> dict[str, Any]
 
     if settings.auth_disabled:
         return {
-            "user_id": int(os.getenv("DEV_AUTH_USER_ID", "1")),
-            "role": os.getenv("DEV_AUTH_ROLE", "administrateur"),
-            "email": os.getenv("DEV_AUTH_EMAIL", "dev@terangacare.local"),
+            "sub": "1",
+            "user_id": 1,
+            "email": "dev@terangacare.local",
+            "role": "administrateur",
+            "roles": ["administrateur"],
+            "iss": settings.jwt_issuer,
+            "aud": settings.jwt_audience,
         }
 
     try:
-        return _decode_with_jwks(token, settings, get_jwks_sync(settings))
-    except (JWTError, ValueError, httpx.HTTPError):
+        return _decode_token(token, settings)
+    except (JWTError, ValueError, TypeError):
         return None
 
 
@@ -138,6 +161,8 @@ async def get_current_user(
     settings: Settings = Depends(get_settings),
 ) -> TokenUser:
     if settings.auth_disabled:
+        from app.dev_auth import build_dev_token_user
+
         return build_dev_token_user(settings)
 
     if credentials is None or credentials.scheme.lower() != "bearer":
@@ -147,11 +172,9 @@ async def get_current_user(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    token = credentials.credentials
-
     try:
-        return await decode_access_token(token, settings)
-    except (JWTError, ValueError, httpx.HTTPError) as exc:
+        return await decode_access_token(credentials.credentials, settings)
+    except (JWTError, ValueError, TypeError) as exc:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or expired token",

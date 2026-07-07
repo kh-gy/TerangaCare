@@ -1,13 +1,15 @@
 # TerangaCare Backend
 
-Backend FastAPI de TerangaCare avec validation des tokens Keycloak.
+Backend FastAPI de TerangaCare avec authentification JWT locale.
 
 ## Variables d'environnement
 
 - `DATABASE_URL`
-- `KEYCLOAK_SERVER_URL`
-- `KEYCLOAK_REALM`
-- `KEYCLOAK_AUDIENCE` (optionnel si le token vient directement du client frontend)
+- `JWT_SECRET_KEY`
+- `JWT_ALGORITHM` (par défaut `HS256`)
+- `JWT_ISSUER`
+- `JWT_AUDIENCE`
+- `ACCESS_TOKEN_EXPIRE_MINUTES`
 - `CORS_ORIGINS`
 - `APP_ENV=development` pour désactiver l'authentification en local
 

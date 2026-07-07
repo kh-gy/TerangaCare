@@ -1,6 +1,6 @@
 """Schémas — Validation des requêtes/réponses pour l'API TerangaCare."""
 
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, Field
 from datetime import datetime
 from decimal import Decimal
 from typing import Optional, List
@@ -13,12 +13,14 @@ from typing import Optional, List
 
 class TokenUser(BaseModel):
     sub: str
+    user_id: int
     email: str | None = None
     given_name: str | None = None
     family_name: str | None = None
     preferred_username: str | None = None
-    roles: list[str] = []
-    issuer: str
+    role: str | None = None
+    roles: list[str] = Field(default_factory=list)
+    issuer: str = "terangacare-api"
     audience: str | list[str] | None = None
 
 # ============================================================================

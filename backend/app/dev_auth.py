@@ -11,13 +11,15 @@ from app.settings import Settings
 def build_dev_token_user(settings: Settings) -> TokenUser:
     return TokenUser(
         sub="dev-auth-user",
+        user_id=1,
         email="dev@terangacare.local",
         given_name="Teranga",
         family_name="Care",
         preferred_username="dev",
+        role="administrateur",
         roles=["administrateur"],
-        issuer=settings.issuer,
-        audience=settings.keycloak_audience,
+        issuer=settings.jwt_issuer,
+        audience=settings.jwt_audience,
     )
 
 

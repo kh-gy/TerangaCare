@@ -1,6 +1,6 @@
 """Router pour la gestion des médecins — Phase 3."""
 
-from fastapi import APIRouter, HTTPException, status, Depends, Query
+from fastapi import APIRouter, HTTPException, status, Depends, Query, Header
 from sqlalchemy.orm import Session
 from sqlalchemy import and_
 from app.database import get_db
@@ -21,7 +21,7 @@ settings = get_settings()
 # ===== Obtenir l'utilisateur depuis le JWT =====
 
 def get_current_user(
-    authorization: str = None,
+    authorization: str | None = Header(None),
     db: Session = Depends(get_db)
 ):
     """Extraire l'utilisateur depuis le JWT token (Authorization header)"""
@@ -124,7 +124,7 @@ def get_medecins(
 def update_tarif(
     medecin_id: int,
     request: TarifUpdateRequest,
-    authorization: str = None,
+    authorization: str | None = Header(None),
     db: Session = Depends(get_db)
 ):
     """
