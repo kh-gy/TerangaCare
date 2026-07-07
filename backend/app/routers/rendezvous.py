@@ -167,7 +167,8 @@ def create_rendezvous(
         )
     
     # 4. Vérifier que la date/heure est dans le futur
-    if request.date_heure.replace(tzinfo=None) <= datetime.now(timezone.utc):
+    now_utc_naive = datetime.now(timezone.utc).replace(tzinfo=None)
+    if request.date_heure.replace(tzinfo=None) <= now_utc_naive:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="La date et l'heure doivent être dans le futur"
