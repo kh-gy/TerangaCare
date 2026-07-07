@@ -10,7 +10,7 @@ et orientation post-consultation.
 ## 🛠️ Stack technique
 - **Frontend** : React.js + Vite
 - **Backend** : FastAPI + SQLAlchemy + Alembic
-- **Authentification** : JWT local signé côté backend
+- **Authentification** : JWT local côté backend, avec un mode développement sans auth via `APP_ENV=development`
 - **BDD** : SQL relationnel
 - **Vidéo** : PeerJS + WebRTC
 - **Infra** : Docker + Apache 2
