@@ -1,11 +1,11 @@
 // Client HTTP minimal (fetch) pour l'API métier TerangaCare (préfixe /api/v1).
 // Réutilise la configuration d'authentification existante (auth/authApi).
-import { authTokenKey, getApiBaseUrl, isAuthDisabled } from '../auth/authApi';
+import { getApiBaseUrl, getStoredAccessToken } from '../auth/authApi';
 
 const API_V1 = `${getApiBaseUrl()}/api/v1`;
 
 function authHeader() {
-  const token = isAuthDisabled() ? 'dev-access-token' : localStorage.getItem(authTokenKey);
+  const token = getStoredAccessToken();
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
