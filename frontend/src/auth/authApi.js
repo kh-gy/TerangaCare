@@ -4,6 +4,26 @@ const authDisabled = appEnv !== 'production';
 
 export const authTokenKey = 'terangacare_access_token';
 
+function formatApiError(payload, fallback) {
+  const detail = payload?.detail;
+  if (typeof detail === 'string') {
+    return detail;
+  }
+  if (Array.isArray(detail)) {
+    return detail.map((item) => item.msg).join(', ');
+  }
+  return fallback;
+}
+
+function readStoredToken() {
+  const stored = localStorage.getItem(authTokenKey);
+  if (!stored || stored === 'dev-access-token') {
+    localStorage.removeItem(authTokenKey);
+    return null;
+  }
+  return stored;
+}
+
 function buildDevProfile() {
   return {
     sub: 'dev-auth-user',
@@ -40,7 +60,7 @@ export async function loginWithCredentials(email, password) {
   const payload = await response.json().catch(() => ({}));
 
   if (!response.ok) {
-    throw new Error(payload.detail || 'Connexion impossible');
+    throw new Error(formatApiError(payload, 'Connexion impossible'));
   }
 
   return payload;
@@ -72,7 +92,7 @@ export async function registerWithCredentials({ email, password, firstName, last
   const payload = await response.json().catch(() => ({}));
 
   if (!response.ok) {
-    throw new Error(payload.detail || 'Inscription impossible');
+    throw new Error(formatApiError(payload, 'Inscription impossible'));
   }
 
   return payload;
@@ -90,7 +110,8 @@ export async function fetchCurrentUser(token) {
   });
 
   if (!response.ok) {
-    throw new Error('Session invalide');
+    const payload = await response.json().catch(() => ({}));
+    throw new Error(formatApiError(payload, 'Session invalide'));
   }
 
   return response.json();
@@ -102,4 +123,11 @@ export function getApiBaseUrl() {
 
 export function isAuthDisabled() {
   return authDisabled;
+}
+
+export function getStoredAccessToken() {
+  if (authDisabled) {
+    return 'dev-access-token';
+  }
+  return readStoredToken();
 }
