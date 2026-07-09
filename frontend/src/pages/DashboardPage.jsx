@@ -30,6 +30,15 @@ const ACTIONS = [
       <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" /></svg>
     ),
   },
+  {
+    label: 'Téléconsultation vidéo',
+    description: 'Démarrez une consultation vidéo en direct',
+    to: '/teleconsultation',
+    color: 'bg-white', textColor: 'text-[#1a3c6e]',
+    icon: (
+      <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.069A1 1 0 0121 8.82v6.362a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
+    ),
+  },
 ];
 
 export default function DashboardPage() {
@@ -63,7 +72,7 @@ export default function DashboardPage() {
         {/* Actions */}
         <div>
           <h2 className="text-lg font-bold text-[#1a3c6e] mb-4">Que souhaitez-vous faire ?</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {ACTIONS.map((a) => (
               <Link
                 key={a.to}
