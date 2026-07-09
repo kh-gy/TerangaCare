@@ -9,6 +9,7 @@ import MedecinsPage from './pages/MedecinsPage';
 import PrendreRdvPage from './pages/PrendreRdvPage';
 import MesRendezVousPage from './pages/MesRendezVousPage';
 import CarnetSantePage from './pages/CarnetSantePage';
+import TeleconsultationPage from './pages/TeleconsultationPage';
 
 function App() {
   return (
@@ -24,6 +25,7 @@ function App() {
             <Route path="/rendez-vous/nouveau" element={<PrendreRdvPage />} />
             <Route path="/mes-rendez-vous" element={<MesRendezVousPage />} />
             <Route path="/patients/:id/carnet" element={<CarnetSantePage />} />
+            <Route path="/teleconsultation" element={<TeleconsultationPage />} />
           </Route>
         </Routes>
       </Router>
