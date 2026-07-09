@@ -1,13 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
 import { AuthContext } from './authContext';
-import { authTokenKey, fetchCurrentUser, getApiBaseUrl, isAuthDisabled, loginWithCredentials, registerWithCredentials } from './authApi';
+import { authTokenKey, fetchCurrentUser, getApiBaseUrl, getStoredAccessToken, isAuthDisabled, loginWithCredentials, registerWithCredentials } from './authApi';
 
 export const AuthProvider = ({ children }) => {
-  const [initialized, setInitialized] = useState(() => isAuthDisabled() || !localStorage.getItem(authTokenKey));
+  const [initialized, setInitialized] = useState(() => isAuthDisabled() || !getStoredAccessToken());
   const [authenticated, setAuthenticated] = useState(() => isAuthDisabled());
   const [profile, setProfile] = useState(null);
   const [error, setError] = useState(null);
-  const [accessToken, setAccessToken] = useState(() => (isAuthDisabled() ? 'dev-access-token' : localStorage.getItem(authTokenKey)));
+  const [accessToken, setAccessToken] = useState(() => getStoredAccessToken());
 
   useEffect(() => {
     if (isAuthDisabled()) {

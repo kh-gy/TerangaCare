@@ -1,6 +1,6 @@
 """Router pour la gestion des rendez-vous """
 
-from fastapi import APIRouter, HTTPException, status, Depends, Header
+from fastapi import APIRouter, HTTPException, status, Depends
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
 from datetime import datetime, timezone
@@ -88,8 +88,8 @@ def get_current_patient(
 
 @router.get("/mes-rendez-vous", response_model=list[RendezVousResponse])
 def get_my_rendezvous(
-    authorization: str | None = Header(None),
-    db: Session = Depends(get_db)
+    current_user: Utilisateur = Depends(get_current_user),
+    db: Session = Depends(get_db),
 ):
     """
     Récupérer les rendez-vous du médecin authentifié.
@@ -101,10 +101,7 @@ def get_my_rendezvous(
     - Liste des rendez-vous du médecin avec statut "EN_ATTENTE"
     """
     
-    # 1. Vérifier l'authentification
-    current_user = get_current_user(authorization, db)
-    
-    # 2. Vérifier que c'est un médecin
+    # 1. Vérifier que c'est un médecin
     if not settings.auth_disabled and current_user.role != "medecin":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -167,7 +164,8 @@ def create_rendezvous(
         )
     
     # 4. Vérifier que la date/heure est dans le futur
-    if request.date_heure.replace(tzinfo=None) <= datetime.now(timezone.utc):
+    now_utc_naive = datetime.now(timezone.utc).replace(tzinfo=None)
+    if request.date_heure.replace(tzinfo=None) <= now_utc_naive:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="La date et l'heure doivent être dans le futur"
