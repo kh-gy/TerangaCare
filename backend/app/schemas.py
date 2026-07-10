@@ -141,6 +141,26 @@ class OrdonnanceResponse(BaseModel):
         from_attributes = True
 
 
+class OrdonnanceListItem(BaseModel):
+    """Ordonnance détaillée pour l'affichage (liste patient / médecin)"""
+    id: int
+    medicaments: List[str] = []
+    posologie: List[str] = []
+    statut: str
+    date_emission: datetime
+    date_expiration: datetime
+    medecin_id: int
+    patient_id: int
+    teleconsultation_id: Optional[int] = None
+    medecin_nom: Optional[str] = None
+    medecin_prenom: Optional[str] = None
+    patient_nom: Optional[str] = None
+    patient_prenom: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+
 # ============================================================================
 # AVIS
 # ============================================================================
@@ -213,9 +233,17 @@ class TeleconsultationResponse(BaseModel):
     duree: Optional[int] = None  # en minutes
     lien_video: Optional[str] = None
     compte_rendu: Optional[str] = None
+    rendez_vous_id: Optional[int] = None
+    peer_id: Optional[str] = None  # identifiant de room PeerJS (alias de lien_video)
 
     class Config:
         from_attributes = True
+
+
+class TeleconsultationEndRequest(BaseModel):
+    """Requête pour clôturer une téléconsultation"""
+    duree: Optional[int] = None          # durée réelle en minutes
+    compte_rendu: Optional[str] = None   # notes du médecin
 
 
 # ============================================================================
