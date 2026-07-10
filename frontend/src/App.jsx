@@ -15,6 +15,9 @@ import OrdonnancesPage from './pages/OrdonnancesPage';
 import RedigerOrdonnancePage from './pages/RedigerOrdonnancePage';
 import PatientsPage from './pages/PatientsPage';
 import TeleconsultationPage from './pages/TeleconsultationPage';
+import PaiementPage from './pages/PaiementPage';
+import AvisMedecinPage from './pages/AvisMedecinPage';
+import OrientationPage from './pages/OrientationPage';
 
 function App() {
   return (
@@ -36,6 +39,9 @@ function App() {
             <Route path="/ordonnances" element={<OrdonnancesPage />} />
             <Route path="/ordonnances/nouvelle" element={<RedigerOrdonnancePage />} />
             <Route path="/teleconsultation" element={<TeleconsultationPage />} />
+            <Route path="/paiement" element={<PaiementPage />} />
+            <Route path="/medecins/:id/avis" element={<AvisMedecinPage />} />
+            <Route path="/orientation" element={<OrientationPage />} />
           </Route>
         </Routes>
       </Router>

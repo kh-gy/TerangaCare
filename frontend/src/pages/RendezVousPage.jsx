@@ -93,6 +93,12 @@ export default function RendezVousPage() {
                         Rejoindre
                       </button>
                     )}
+                    {rdv.statut === 'CONFIRME' && (
+                      <button onClick={() => navigate(`/paiement?rdv=${rdv.id}`)}
+                        className="bg-[#2aab8e] text-white text-xs px-3 py-1.5 rounded-lg font-semibold hover:bg-[#238f77]">
+                        Payer
+                      </button>
+                    )}
                     {canCancel && (
                       <button onClick={() => handleCancel(rdv.id)} disabled={busy === rdv.id}
                         className="border border-red-300 text-red-500 text-xs px-3 py-1.5 rounded-lg font-semibold hover:bg-red-50 disabled:opacity-50">

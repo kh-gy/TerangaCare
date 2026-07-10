@@ -91,12 +91,20 @@ export default function MedecinsPage() {
                   {m.tarif_consultation != null && (
                     <p className="text-xs text-[#2aab8e] font-semibold mt-1">{Number(m.tarif_consultation).toLocaleString()} FCFA / consultation</p>
                   )}
-                  <button
-                    onClick={() => navigate(`/rendez-vous/nouveau?medecin=${m.id}`)}
-                    className="mt-3 bg-[#1a3c6e] text-white text-xs px-4 py-2 rounded-xl font-semibold hover:bg-[#152f58] transition-colors"
-                  >
-                    Prendre RDV
-                  </button>
+                  <div className="mt-3 flex gap-2">
+                    <button
+                      onClick={() => navigate(`/rendez-vous/nouveau?medecin=${m.id}`)}
+                      className="bg-[#1a3c6e] text-white text-xs px-4 py-2 rounded-xl font-semibold hover:bg-[#152f58] transition-colors"
+                    >
+                      Prendre RDV
+                    </button>
+                    <button
+                      onClick={() => navigate(`/medecins/${m.id}/avis`)}
+                      className="border border-[#c8d9ef] text-[#1a3c6e] text-xs px-4 py-2 rounded-xl font-semibold hover:bg-[#eef3fa] transition-colors"
+                    >
+                      Avis
+                    </button>
+                  </div>
                 </div>
               </div>
             ))}
