@@ -24,6 +24,9 @@ from app.routers import rendezvous
 from app.routers import patients
 from app.routers import ordonnances
 from app.routers import teleconsultations
+from app.routers import paiements
+from app.routers import avis
+from app.routers import orientation
 
 settings = get_settings()
 
@@ -149,7 +152,6 @@ app.include_router(rendezvous.router)
 app.include_router(patients.router)
 app.include_router(ordonnances.router)
 app.include_router(teleconsultations.router)
-
-#à compléter
-# app.include_router(auth.router)
-# app.include_router(paiements.router)
+app.include_router(paiements.router)
+app.include_router(avis.router)
+app.include_router(orientation.router)

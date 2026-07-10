@@ -232,6 +232,9 @@ class AvisResponse(BaseModel):
     note: int
     commentaire: Optional[str]
     date_avis: datetime
+    medecin_id: Optional[int] = None
+    patient_prenom: Optional[str] = None
+    patient_nom: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -310,6 +313,7 @@ class OrientationCreate(BaseModel):
     nom_structure: str
     motif: Optional[str] = None
     localisation: Optional[str] = None
+    patient_id: Optional[int] = None
 
 
 class OrientationResponse(BaseModel):
@@ -320,6 +324,8 @@ class OrientationResponse(BaseModel):
     motif: Optional[str]
     localisation: Optional[str]
     date_orientation: datetime
+    medecin_id: Optional[int] = None
+    patient_id: Optional[int] = None
 
     class Config:
         from_attributes = True
