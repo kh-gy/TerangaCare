@@ -1,14 +1,15 @@
 """Router — Module Médical : Carnet de Santé des patients."""
 
 import json
+from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.dev_auth import resolve_demo_user
-from app.models import CarnetSante, Patient, Utilisateur
-from app.schemas import CarnetSanteResponse
+from app.models import CarnetSante, Medecin, Patient, RendezVous, Utilisateur
+from app.schemas import CarnetSanteResponse, CarnetSanteUpdate, PatientListItem
 from app.security import verify_token
 from app.settings import get_settings
 
@@ -114,3 +115,98 @@ def get_carnet_sante(
         maladiesChroniques=_to_list(carnet.maladies_chroniques),
         dateDerniereMiseAJour=carnet.date_derniere_maj,
     )
+
+
+def _dump_list(value):
+    """Sérialise une liste en JSON pour le stockage Text (None laissé tel quel)."""
+    if value is None:
+        return None
+    return json.dumps(list(value), ensure_ascii=False)
+
+
+# ===== PUT /api/v1/patients/{id}/carnet =====
+
+@router.put("/{patient_id}/carnet", response_model=CarnetSanteResponse)
+def upsert_carnet_sante(
+    patient_id: int,
+    body: CarnetSanteUpdate,
+    current_user: Utilisateur = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Crée ou met à jour le carnet de santé d'un patient.
+    - Un patient ne peut modifier que le sien.
+    - Un médecin peut mettre à jour le carnet d'un patient.
+    """
+    role = (current_user.role or "").lower()
+    if not settings.auth_disabled and role == "patient" and current_user.id != patient_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Vous ne pouvez modifier que votre propre carnet de santé",
+        )
+
+    patient = db.query(Patient).filter(Patient.id == patient_id).first()
+    if not patient:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Patient {patient_id} introuvable")
+
+    carnet = db.query(CarnetSante).filter(CarnetSante.patient_id == patient_id).first()
+    if not carnet:
+        carnet = CarnetSante(patient_id=patient_id)
+        db.add(carnet)
+
+    data = body.model_dump(exclude_unset=True)
+    if "antecedents" in data:
+        carnet.antecedents = _dump_list(data["antecedents"])
+    if "allergies" in data:
+        carnet.allergies = _dump_list(data["allergies"])
+    if "maladies_chroniques" in data:
+        carnet.maladies_chroniques = _dump_list(data["maladies_chroniques"])
+    if "groupe_sanguin" in data:
+        carnet.groupe_sanguin = data["groupe_sanguin"]
+
+    db.commit()
+    db.refresh(carnet)
+    return CarnetSanteResponse(
+        id=carnet.id,
+        antecedents=_to_list(carnet.antecedents),
+        allergies=_to_list(carnet.allergies),
+        groupeSanguin=carnet.groupe_sanguin,
+        maladiesChroniques=_to_list(carnet.maladies_chroniques),
+        dateDerniereMiseAJour=carnet.date_derniere_maj,
+    )
+
+
+# ===== GET /api/v1/patients (file du médecin) =====
+
+@router.get("", response_model=list[PatientListItem])
+def list_patients(
+    current_user: Utilisateur = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Liste des patients ayant un rendez-vous avec le médecin courant."""
+    if settings.auth_disabled:
+        medecin_id = db.query(Medecin).order_by(Medecin.id.asc()).first().id
+    else:
+        if (current_user.role or "").lower() != "medecin":
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Réservé aux médecins")
+        medecin_id = current_user.id
+
+    rdvs = db.query(RendezVous).filter(RendezVous.medecin_id == medecin_id).all()
+    agg: dict[int, dict] = {}
+    for r in rdvs:
+        e = agg.setdefault(r.patient_id, {"nb": 0, "dernier": None})
+        e["nb"] += 1
+        if e["dernier"] is None or r.date_heure > e["dernier"]:
+            e["dernier"] = r.date_heure
+
+    items = []
+    for pid, e in agg.items():
+        p = db.query(Patient).filter(Patient.id == pid).first()
+        if not p:
+            continue
+        items.append(PatientListItem(
+            id=p.id, nom=p.nom, prenom=p.prenom, email=p.email,
+            nb_rdv=e["nb"], dernier_rdv=e["dernier"],
+        ))
+    items.sort(key=lambda x: (x.dernier_rdv.replace(tzinfo=None) if x.dernier_rdv else datetime.min), reverse=True)
+    return items
