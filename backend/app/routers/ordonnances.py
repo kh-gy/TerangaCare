@@ -10,9 +10,20 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.dev_auth import resolve_demo_user
 from app.models import Medecin, Ordonnance, Patient, Teleconsultation, Utilisateur
-from app.schemas import OrdonnanceCreate, OrdonnanceResponse
+from app.schemas import OrdonnanceCreate, OrdonnanceListItem, OrdonnanceResponse
 from app.security import verify_token
 from app.settings import get_settings
+
+
+def _json_to_list(value):
+    """Désérialise un champ Text (JSON) en liste ; tolère l'ancien format brut."""
+    if not value:
+        return []
+    try:
+        parsed = json.loads(value)
+        return [str(x) for x in parsed] if isinstance(parsed, list) else [str(parsed)]
+    except (json.JSONDecodeError, TypeError):
+        return [v.strip() for v in str(value).split(",") if v.strip()]
 
 router = APIRouter(prefix="/api/v1/ordonnances", tags=["ordonnances"])
 settings = get_settings()
@@ -148,3 +159,50 @@ def create_ordonnance(
         dateEmission=nouvelle_ordonnance.date_emission,
         statut=nouvelle_ordonnance.statut,
     )
+
+
+# ===== GET /api/v1/ordonnances =====
+
+@router.get("", response_model=list[OrdonnanceListItem])
+def list_ordonnances(
+    current_user: Utilisateur = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Liste les ordonnances de l'utilisateur courant.
+    - Patient : ses ordonnances reçues.
+    - Médecin : les ordonnances qu'il a émises.
+    """
+    q = db.query(Ordonnance)
+    role = (current_user.role or "").lower()
+    if not settings.auth_disabled:
+        if role == "patient":
+            q = q.filter(Ordonnance.patient_id == current_user.id)
+        elif role == "medecin":
+            q = q.filter(Ordonnance.medecin_id == current_user.id)
+    else:
+        # En mode dev, l'utilisateur démo est un médecin : on montre ses émissions.
+        q = q.filter(Ordonnance.medecin_id == current_user.id)
+
+    ordonnances = q.order_by(Ordonnance.date_emission.desc()).all()
+
+    items = []
+    for o in ordonnances:
+        medecin = db.query(Medecin).filter(Medecin.id == o.medecin_id).first()
+        patient = db.query(Patient).filter(Patient.id == o.patient_id).first()
+        items.append(OrdonnanceListItem(
+            id=o.id,
+            medicaments=_json_to_list(o.medicaments),
+            posologie=_json_to_list(o.posologie),
+            statut=o.statut,
+            date_emission=o.date_emission,
+            date_expiration=o.date_expiration,
+            medecin_id=o.medecin_id,
+            patient_id=o.patient_id,
+            teleconsultation_id=o.teleconsultation_id,
+            medecin_nom=medecin.nom if medecin else None,
+            medecin_prenom=medecin.prenom if medecin else None,
+            patient_nom=patient.nom if patient else None,
+            patient_prenom=patient.prenom if patient else None,
+        ))
+    return items
