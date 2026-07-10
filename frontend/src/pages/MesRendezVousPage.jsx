@@ -1,7 +1,19 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import Header from '../components/layout/Header';
-import { fetchMesRendezVous, confirmRendezVous } from '../api/rendezvous';
+import { fetchRendezVous, confirmRendezVous } from '../api/rendezvous';
+import { createTeleconsultation, startTeleconsultation } from '../api/teleconsultations';
+
+function StatusBadge({ statut }) {
+  const map = {
+    CONFIRME: { label: 'Confirmé', cls: 'bg-green-100 text-green-700' },
+    EN_ATTENTE: { label: 'En attente', cls: 'bg-yellow-100 text-yellow-700' },
+    ANNULE: { label: 'Annulé', cls: 'bg-red-100 text-red-700' },
+    TERMINE: { label: 'Terminé', cls: 'bg-gray-100 text-gray-600' },
+  };
+  const { label, cls } = map[statut] ?? { label: statut, cls: 'bg-gray-100 text-gray-600' };
+  return <span className={`text-xs font-semibold px-2 py-1 rounded-full ${cls}`}>{label}</span>;
+}
 
 function formatDateHeure(dateStr) {
   const d = new Date(dateStr);
@@ -10,14 +22,15 @@ function formatDateHeure(dateStr) {
 }
 
 export default function MesRendezVousPage() {
+  const navigate = useNavigate();
   const [rdvs, setRdvs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [confirming, setConfirming] = useState(null);
+  const [busy, setBusy] = useState(null);
 
   useEffect(() => {
     let active = true;
-    fetchMesRendezVous()
+    fetchRendezVous()
       .then((data) => { if (active) setRdvs(data); })
       .catch((e) => { if (active) setError(e.message); })
       .finally(() => { if (active) setLoading(false); });
@@ -25,74 +38,112 @@ export default function MesRendezVousPage() {
   }, []);
 
   async function handleConfirm(id) {
-    setConfirming(id);
+    setBusy(id);
     try {
       await confirmRendezVous(id);
-      // L'endpoint ne renvoie que les RDV EN_ATTENTE : on retire le confirmé localement.
-      setRdvs((prev) => prev.filter((r) => r.id !== id));
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setConfirming(null);
-    }
+      setRdvs((prev) => prev.map((r) => (r.id === id ? { ...r, statut: 'CONFIRME' } : r)));
+    } catch (e) { setError(e.message); } finally { setBusy(null); }
   }
+
+  async function handleStart(rdv) {
+    setBusy(rdv.id);
+    try {
+      const tc = await createTeleconsultation(rdv.id);
+      await startTeleconsultation(tc.id);
+      navigate(`/teleconsultation?tc=${tc.id}&role=host&patient=${rdv.patient_id}`);
+    } catch (e) { setError(e.message); setBusy(null); }
+  }
+
+  const pending = rdvs.filter((r) => r.statut === 'EN_ATTENTE');
+  const others = rdvs.filter((r) => r.statut !== 'EN_ATTENTE');
 
   return (
     <div className="min-h-screen bg-[#eef3fa]">
       <Header />
       <main className="max-w-3xl mx-auto px-4 py-8">
         <div className="mb-6">
-          <h1 className="text-2xl font-bold text-[#1a3c6e]">Demandes de rendez-vous</h1>
-          <p className="text-sm text-gray-500">Confirmez les rendez-vous en attente</p>
+          <h1 className="text-2xl font-bold text-[#1a3c6e]">Mon agenda</h1>
+          <p className="text-sm text-gray-500">Confirmez, démarrez vos consultations et rédigez les ordonnances</p>
         </div>
 
+        {error && <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-600 mb-4">{error}</div>}
+
         {loading ? (
-          <div className="flex justify-center py-20">
-            <div className="w-8 h-8 border-4 border-[#1a3c6e] border-t-transparent rounded-full animate-spin" />
-          </div>
-        ) : error ? (
-          <div className="bg-red-50 border border-red-200 rounded-2xl p-6 text-center text-sm text-red-600">{error}</div>
+          <div className="flex justify-center py-20"><div className="w-8 h-8 border-4 border-[#1a3c6e] border-t-transparent rounded-full animate-spin" /></div>
         ) : rdvs.length === 0 ? (
           <div className="bg-white rounded-2xl p-12 text-center shadow-sm">
-            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-              </svg>
-            </div>
-            <p className="text-gray-500 font-medium">Aucune demande en attente.</p>
+            <p className="text-gray-500 font-medium">Aucun rendez-vous dans votre agenda.</p>
           </div>
         ) : (
-          <div className="flex flex-col gap-3">
-            {rdvs.map((rdv) => (
-              <div key={rdv.id} className="bg-white rounded-2xl p-5 shadow-sm flex gap-4 items-start">
-                <div className="w-12 h-12 rounded-xl bg-blue-100 flex items-center justify-center flex-shrink-0">
-                  <svg className="w-6 h-6 text-[#1a3c6e]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                  </svg>
+          <div className="flex flex-col gap-8">
+            {pending.length > 0 && (
+              <section>
+                <h2 className="text-base font-bold text-[#1a3c6e] mb-3">Demandes en attente ({pending.length})</h2>
+                <div className="flex flex-col gap-3">
+                  {pending.map((rdv) => (
+                    <RdvCard key={rdv.id} rdv={rdv} busy={busy === rdv.id} onConfirm={handleConfirm} onStart={handleStart} navigate={navigate} />
+                  ))}
                 </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap mb-1">
-                    <p className="text-sm font-bold text-[#1a3c6e]">Patient #{rdv.patient_id}</p>
-                    <span className="text-xs font-semibold px-2 py-1 rounded-full bg-yellow-100 text-yellow-700">En attente</span>
-                  </div>
-                  <p className="text-xs text-gray-500 capitalize">{formatDateHeure(rdv.date_heure)}</p>
-                  {rdv.motif && <p className="text-xs text-gray-400 mt-1 italic">"{rdv.motif}"</p>}
-                  <Link to={`/patients/${rdv.patient_id}/carnet`} className="text-xs text-[#2aab8e] font-semibold hover:underline mt-1 inline-block">
-                    Voir le carnet de santé
-                  </Link>
+              </section>
+            )}
+            {others.length > 0 && (
+              <section>
+                <h2 className="text-base font-bold text-[#1a3c6e] mb-3">Rendez-vous ({others.length})</h2>
+                <div className="flex flex-col gap-3">
+                  {others.map((rdv) => (
+                    <RdvCard key={rdv.id} rdv={rdv} busy={busy === rdv.id} onConfirm={handleConfirm} onStart={handleStart} navigate={navigate} />
+                  ))}
                 </div>
-                <button
-                  onClick={() => handleConfirm(rdv.id)}
-                  disabled={confirming === rdv.id}
-                  className="flex-shrink-0 bg-green-600 text-white text-xs px-4 py-2 rounded-xl font-semibold hover:bg-green-700 disabled:opacity-50 transition-colors"
-                >
-                  {confirming === rdv.id ? '…' : 'Confirmer'}
-                </button>
-              </div>
-            ))}
+              </section>
+            )}
           </div>
         )}
       </main>
+    </div>
+  );
+}
+
+function RdvCard({ rdv, busy, onConfirm, onStart, navigate }) {
+  const tcDone = rdv.teleconsultation_statut === 'TERMINEE';
+  return (
+    <div className="bg-white rounded-2xl p-5 shadow-sm flex gap-4 items-start">
+      <div className="w-12 h-12 rounded-full bg-[#1a3c6e] text-white flex items-center justify-center font-bold flex-shrink-0">
+        {(rdv.patient_prenom?.[0] ?? '?')}
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2 flex-wrap mb-1">
+          <p className="text-sm font-bold text-[#1a3c6e]">{rdv.patient_prenom} {rdv.patient_nom}</p>
+          <StatusBadge statut={rdv.statut} />
+        </div>
+        <p className="text-xs text-gray-500 capitalize">{formatDateHeure(rdv.date_heure)}</p>
+        {rdv.motif && <p className="text-xs text-gray-400 mt-1 italic">"{rdv.motif}"</p>}
+        <button
+          onClick={() => navigate(`/patients/${rdv.patient_id}/carnet`)}
+          className="text-xs text-[#2aab8e] font-semibold hover:underline mt-1"
+        >
+          Voir le carnet
+        </button>
+      </div>
+      <div className="flex flex-col gap-2 flex-shrink-0">
+        {rdv.statut === 'EN_ATTENTE' && (
+          <button onClick={() => onConfirm(rdv.id)} disabled={busy}
+            className="bg-green-600 text-white text-xs px-3 py-1.5 rounded-lg font-semibold hover:bg-green-700 disabled:opacity-50">
+            Confirmer
+          </button>
+        )}
+        {rdv.statut === 'CONFIRME' && !tcDone && (
+          <button onClick={() => onStart(rdv)} disabled={busy}
+            className="bg-[#1a3c6e] text-white text-xs px-3 py-1.5 rounded-lg font-semibold hover:bg-[#152f58] disabled:opacity-50">
+            Démarrer
+          </button>
+        )}
+        {tcDone && (
+          <button onClick={() => navigate(`/ordonnances/nouvelle?tc=${rdv.teleconsultation_id}&patient=${rdv.patient_id}`)}
+            className="bg-[#2aab8e] text-white text-xs px-3 py-1.5 rounded-lg font-semibold hover:bg-[#238f77]">
+            Ordonnance
+          </button>
+        )}
+      </div>
     </div>
   );
 }

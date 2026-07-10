@@ -19,7 +19,9 @@ const Header = () => {
     ? [
         { to: '/dashboard', label: 'Tableau de bord' },
         { to: '/medecins', label: 'Médecins' },
-        { to: '/mes-rendez-vous', label: 'Mes RDV' },
+        { to: '/rendez-vous', label: 'Mes RDV' },
+        { to: '/ordonnances', label: 'Ordonnances' },
+        { to: '/mes-rendez-vous', label: 'Agenda' },
       ]
     : [{ to: '/', label: 'Accueil' }];
 

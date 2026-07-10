@@ -9,10 +9,14 @@ import Peer from 'peerjs';
  * `?peer=<id>` — le destinataire appelle automatiquement l'émetteur.
  *
  * Props :
- *  - initialPeerId : id distant à appeler automatiquement à l'ouverture (optionnel)
+ *  - initialPeerId : id distant à appeler automatiquement (mode standalone)
+ *  - roomPeerId    : identifiant de room d'une téléconsultation (backend)
+ *  - mode          : 'standalone' | 'host' | 'guest'
+ *      · host  : le médecin s'enregistre SUR roomPeerId et attend l'appel
+ *      · guest : le patient appelle roomPeerId
  *  - onLeave       : callback appelé quand l'utilisateur raccroche (optionnel)
  */
-export default function VideoCall({ initialPeerId = '', onLeave }) {
+export default function VideoCall({ initialPeerId = '', roomPeerId = '', mode = 'standalone', onLeave }) {
   const localVideoRef = useRef(null);
   const remoteVideoRef = useRef(null);
   const peerRef = useRef(null);
@@ -75,14 +79,16 @@ export default function VideoCall({ initialPeerId = '', onLeave }) {
         cameraTrackRef.current = stream.getVideoTracks()[0] || null;
         if (localVideoRef.current) localVideoRef.current.srcObject = stream;
 
-        const peer = new Peer();
+        // En mode "host", le médecin s'enregistre sur l'id de room pour être joignable.
+        const peer = mode === 'host' && roomPeerId ? new Peer(roomPeerId) : new Peer();
         peerRef.current = peer;
 
         peer.on('open', (id) => {
           if (cancelled) return;
           setMyId(id);
           setStatus('ready');
-          if (initialPeerId) startCall(initialPeerId);
+          if (mode === 'guest' && roomPeerId) startCall(roomPeerId);
+          else if (mode === 'standalone' && initialPeerId) startCall(initialPeerId);
         });
 
         peer.on('call', (call) => {
@@ -243,8 +249,18 @@ export default function VideoCall({ initialPeerId = '', onLeave }) {
         </button>
       </div>
 
-      {/* Connexion / partage du lien */}
-      {status !== 'in-call' && (
+      {/* En téléconsultation reliée : indication d'attente */}
+      {mode !== 'standalone' && status !== 'in-call' && !error && (
+        <div className="bg-white rounded-2xl p-5 shadow-sm text-center">
+          <p className="text-sm text-[#1a3c6e] font-semibold">
+            {mode === 'host' ? 'En attente que le patient rejoigne…' : 'Connexion au médecin…'}
+          </p>
+          <p className="text-xs text-gray-500 mt-1">Salle : {roomPeerId}</p>
+        </div>
+      )}
+
+      {/* Connexion / partage du lien (mode autonome) */}
+      {mode === 'standalone' && status !== 'in-call' && (
         <div className="bg-white rounded-2xl p-5 shadow-sm flex flex-col gap-4">
           <div>
             <p className="text-sm font-bold text-[#1a3c6e] mb-2">Inviter le correspondant</p>
