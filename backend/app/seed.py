@@ -15,7 +15,7 @@ import json
 from datetime import datetime, timezone, timedelta
 
 from app.database import SessionLocal, init_db
-from app.models import Medecin, Patient, CarnetSante, RendezVous
+from app.models import Administrateur, Medecin, Patient, CarnetSante, RendezVous
 from app.security import hash_password
 
 MEDECINS = [
@@ -39,6 +39,12 @@ def run():
                 mot_de_passe=hash_password("password123"), role="medecin",
                 numero_ordre=f"ORD-{i:03d}", localisation=m["localisation"],
                 tarif_consultation=m["tarif"], note_moyenne=m["note"], disponibilite=True,
+            ))
+
+        if not db.query(Administrateur).filter(Administrateur.email == "admin@terangacare.sn").first():
+            db.add(Administrateur(
+                prenom="Awa", nom="Ndiaye", email="admin@terangacare.sn",
+                mot_de_passe=hash_password("password123"), role="administrateur",
             ))
 
         patient = db.query(Patient).filter(Patient.email == "patient@terangacare.sn").first()
@@ -73,8 +79,11 @@ def run():
 
         db.commit()
         print("Seed terminé.")
-        print(f"  Médecins : {db.query(Medecin).count()} | Patients : {db.query(Patient).count()} | RDV : {db.query(RendezVous).count()}")
-        print("  Comptes démo (password123) : patient@terangacare.sn / a.diallo@terangacare.sn")
+        print(f"  Médecins : {db.query(Medecin).count()} | Patients : {db.query(Patient).count()} | Admins : {db.query(Administrateur).count()} | RDV : {db.query(RendezVous).count()}")
+        print("  Comptes démo (password123) :")
+        print("    - Patient       : patient@terangacare.sn")
+        print("    - Médecin       : a.diallo@terangacare.sn")
+        print("    - Administrateur: admin@terangacare.sn")
     finally:
         db.close()
 

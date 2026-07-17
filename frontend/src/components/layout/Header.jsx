@@ -34,7 +34,7 @@ const Header = () => {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
             </svg>
           </div>
-          <span className="text-lg font-bold text-[#1a3c6e]">CareConnect</span>
+          <span className="text-lg font-bold text-[#1a3c6e]">TerangaCare</span>
         </Link>
 
         {/* Desktop nav */}
