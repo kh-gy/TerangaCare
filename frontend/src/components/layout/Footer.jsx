@@ -66,7 +66,7 @@ const Footer = () => {
         <div className="max-w-6xl mx-auto px-4">
           <div className="flex flex-col md:flex-row justify-between gap-8">
             <div>
-              <h3 className="text-xl font-bold mb-3">CareConnect</h3>
+              <h3 className="text-xl font-bold mb-3">TerangaCare</h3>
               <p className="text-blue-200 text-sm max-w-xs">
                 La santé connectée pour tous. Une plateforme solidaire pour relier patients, médecins et pharmacies au Sénégal.
               </p>
@@ -83,7 +83,7 @@ const Footer = () => {
               <div>
                 <h4 className="font-semibold mb-3 text-sm">Contact</h4>
                 <ul className="space-y-2 text-blue-200 text-sm">
-                  <li>contact@careconnect.sn</li>
+                  <li>contact@terangacare.sn</li>
                   <li>+221 33 000 00 00</li>
                   <li>Dakar, Sénégal</li>
                 </ul>
@@ -91,7 +91,7 @@ const Footer = () => {
             </div>
           </div>
           <div className="border-t border-blue-800 mt-8 pt-6 text-center text-blue-300 text-xs">
-            © 2025 CareConnect. Tous droits réservés.
+            © 2025 TerangaCare. Tous droits réservés.
           </div>
         </div>
       </footer>

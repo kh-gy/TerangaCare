@@ -25,7 +25,7 @@ const Features = () => {
       <div className="max-w-6xl mx-auto px-4 text-center">
         <h2 className="text-2xl md:text-4xl font-bold text-[#1a3c6e] mb-3">Parcours Simplifié</h2>
         <p className="text-gray-500 text-base md:text-lg mb-12">
-          Comment CareConnect vous accompagne au quotidien.
+          Comment TerangaCare vous accompagne au quotidien.
         </p>
 
         <div className="flex flex-col md:flex-row gap-6 justify-center">

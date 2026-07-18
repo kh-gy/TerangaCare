@@ -40,6 +40,27 @@ class MedecinSearch(BaseModel):
         from_attributes = True
 
 
+class MedecinDetail(BaseModel):
+    """Fiche médecin détaillée."""
+    id: int
+    nom: str
+    prenom: str
+    email: Optional[str] = None
+    localisation: Optional[str] = None
+    tarif_consultation: Optional[Decimal] = None
+    note_moyenne: Optional[float] = None
+    disponibilite: bool = True
+    numero_ordre: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+
+class DisponibiliteRequest(BaseModel):
+    """Requête pour basculer la disponibilité d'un médecin."""
+    disponibilite: bool
+
+
 class TarifUpdateRequest(BaseModel):
     """Requête pour mettre à jour tarif"""
     tarif_consultation: Decimal
@@ -93,6 +114,26 @@ class RendezVousConfirmResponse(BaseModel):
         from_attributes = True
 
 
+class RendezVousDetail(BaseModel):
+    """Rendez-vous détaillé pour l'affichage (avec noms des participants)."""
+    id: int
+    date_heure: datetime
+    statut: str
+    motif: Optional[str] = None
+    patient_id: int
+    medecin_id: int
+    patient_nom: Optional[str] = None
+    patient_prenom: Optional[str] = None
+    medecin_nom: Optional[str] = None
+    medecin_prenom: Optional[str] = None
+    medecin_specialite: Optional[str] = None
+    teleconsultation_id: Optional[int] = None
+    teleconsultation_statut: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+
 # ============================================================================
 # CARNET DE SANTÉ
 # ============================================================================
@@ -118,6 +159,19 @@ class CarnetSanteUpdate(BaseModel):
     maladies_chroniques: Optional[List[str]] = None
 
 
+class PatientListItem(BaseModel):
+    """Patient dans la file d'un médecin (dérivé des rendez-vous)."""
+    id: int
+    nom: str
+    prenom: str
+    email: Optional[str] = None
+    nb_rdv: int = 0
+    dernier_rdv: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
 # ============================================================================
 # ORDONNANCES
 # ============================================================================
@@ -141,6 +195,26 @@ class OrdonnanceResponse(BaseModel):
         from_attributes = True
 
 
+class OrdonnanceListItem(BaseModel):
+    """Ordonnance détaillée pour l'affichage (liste patient / médecin)"""
+    id: int
+    medicaments: List[str] = []
+    posologie: List[str] = []
+    statut: str
+    date_emission: datetime
+    date_expiration: datetime
+    medecin_id: int
+    patient_id: int
+    teleconsultation_id: Optional[int] = None
+    medecin_nom: Optional[str] = None
+    medecin_prenom: Optional[str] = None
+    patient_nom: Optional[str] = None
+    patient_prenom: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+
 # ============================================================================
 # AVIS
 # ============================================================================
@@ -158,6 +232,9 @@ class AvisResponse(BaseModel):
     note: int
     commentaire: Optional[str]
     date_avis: datetime
+    medecin_id: Optional[int] = None
+    patient_prenom: Optional[str] = None
+    patient_nom: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -213,9 +290,17 @@ class TeleconsultationResponse(BaseModel):
     duree: Optional[int] = None  # en minutes
     lien_video: Optional[str] = None
     compte_rendu: Optional[str] = None
+    rendez_vous_id: Optional[int] = None
+    peer_id: Optional[str] = None  # identifiant de room PeerJS (alias de lien_video)
 
     class Config:
         from_attributes = True
+
+
+class TeleconsultationEndRequest(BaseModel):
+    """Requête pour clôturer une téléconsultation"""
+    duree: Optional[int] = None          # durée réelle en minutes
+    compte_rendu: Optional[str] = None   # notes du médecin
 
 
 # ============================================================================
@@ -228,6 +313,7 @@ class OrientationCreate(BaseModel):
     nom_structure: str
     motif: Optional[str] = None
     localisation: Optional[str] = None
+    patient_id: Optional[int] = None
 
 
 class OrientationResponse(BaseModel):
@@ -238,6 +324,8 @@ class OrientationResponse(BaseModel):
     motif: Optional[str]
     localisation: Optional[str]
     date_orientation: datetime
+    medecin_id: Optional[int] = None
+    patient_id: Optional[int] = None
 
     class Config:
         from_attributes = True

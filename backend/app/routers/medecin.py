@@ -8,6 +8,8 @@ from app.dev_auth import resolve_demo_user
 from app.models import Medecin, Utilisateur
 from app.schemas import (
     MedecinSearch,
+    MedecinDetail,
+    DisponibiliteRequest,
     TarifUpdateRequest,
     TarifUpdateResponse
 )
@@ -176,3 +178,39 @@ def update_tarif(
         "tarif_consultation": medecin.tarif_consultation,
         "statut": "Mis à jour"
     }
+
+
+# ===== PATCH /api/v1/medecins/me/disponibilite =====
+
+@router.patch("/me/disponibilite", response_model=MedecinDetail)
+def update_ma_disponibilite(
+    request: DisponibiliteRequest,
+    current_user: Utilisateur = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Bascule la disponibilité du médecin courant (visible/masqué dans l'annuaire)."""
+    if settings.auth_disabled:
+        medecin = db.query(Medecin).order_by(Medecin.id.asc()).first()
+    else:
+        if (current_user.role or "").lower() != "medecin":
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Réservé aux médecins")
+        medecin = db.query(Medecin).filter(Medecin.id == current_user.id).first()
+
+    if not medecin:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Profil médecin introuvable")
+
+    medecin.disponibilite = request.disponibilite
+    db.commit()
+    db.refresh(medecin)
+    return medecin
+
+
+# ===== GET /api/v1/medecins/{id} =====
+
+@router.get("/{medecin_id}", response_model=MedecinDetail)
+def get_medecin(medecin_id: int, db: Session = Depends(get_db)):
+    """Fiche détaillée d'un médecin."""
+    medecin = db.query(Medecin).filter(Medecin.id == medecin_id).first()
+    if not medecin:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Médecin introuvable")
+    return medecin

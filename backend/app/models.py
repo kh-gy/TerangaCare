@@ -104,9 +104,8 @@ class Medecin(Utilisateur):
         back_populates="medecin",
         cascade="all, delete-orphan",
     )
-    orientation: Mapped[Orientation | None] = relationship(
+    orientations: Mapped[list[Orientation]] = relationship(
         back_populates="medecin",
-        uselist=False,
         cascade="all, delete-orphan",
     )
     __mapper_args__ = {"polymorphic_identity": Role.MEDECIN.value}
@@ -171,6 +170,9 @@ class Avis(Base):
     patient_id: Mapped[int] = mapped_column(
         ForeignKey("patients.id", ondelete="CASCADE"),
         nullable=False,
+    )
+    medecin_id: Mapped[int | None] = mapped_column(
+        ForeignKey("medecins.id", ondelete="CASCADE"),
     )
 
     patient: Mapped[Patient] = relationship(back_populates="avis")
@@ -258,11 +260,13 @@ class Orientation(Base):
     )
     medecin_id: Mapped[int] = mapped_column(
         ForeignKey("medecins.id", ondelete="CASCADE"),
-        unique=True,
         nullable=False,
     )
+    patient_id: Mapped[int | None] = mapped_column(
+        ForeignKey("patients.id", ondelete="CASCADE"),
+    )
 
-    medecin: Mapped[Medecin] = relationship(back_populates="orientation")
+    medecin: Mapped[Medecin] = relationship(back_populates="orientations")
 
 
 class Teleconsultation(Base):

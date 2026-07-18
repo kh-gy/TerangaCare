@@ -6,11 +6,12 @@ from sqlalchemy.orm import Session
 from datetime import datetime, timezone
 from app.database import get_db
 from app.dev_auth import resolve_demo_user
-from app.models import RendezVous, Patient, Medecin, Utilisateur
+from app.models import RendezVous, Patient, Medecin, Teleconsultation, Utilisateur
 from app.schemas import (
     RendezVousCreate,
     RendezVousResponse,
-    RendezVousConfirmResponse
+    RendezVousConfirmResponse,
+    RendezVousDetail,
 )
 from app.security import verify_token
 from app.settings import get_settings
@@ -242,9 +243,83 @@ def confirm_rendezvous(
     rendezvous.statut = "CONFIRME"
     db.commit()
     db.refresh(rendezvous)
-    
+
     # 6. Retourner la réponse
     return {
         "id": rendezvous.id,
         "statut": rendezvous.statut
     }
+
+
+# ===== Helpers d'affichage =====
+
+def _rdv_detail(rdv: RendezVous, db: Session) -> RendezVousDetail:
+    patient = db.query(Patient).filter(Patient.id == rdv.patient_id).first()
+    medecin = db.query(Medecin).filter(Medecin.id == rdv.medecin_id).first()
+    tc = db.query(Teleconsultation).filter(Teleconsultation.rendez_vous_id == rdv.id).first()
+    return RendezVousDetail(
+        id=rdv.id,
+        date_heure=rdv.date_heure,
+        statut=rdv.statut,
+        motif=rdv.motif,
+        patient_id=rdv.patient_id,
+        medecin_id=rdv.medecin_id,
+        patient_nom=patient.nom if patient else None,
+        patient_prenom=patient.prenom if patient else None,
+        medecin_nom=medecin.nom if medecin else None,
+        medecin_prenom=medecin.prenom if medecin else None,
+        medecin_specialite=getattr(medecin, "specialite", None) if medecin else None,
+        teleconsultation_id=tc.id if tc else None,
+        teleconsultation_statut=tc.statut if tc else None,
+    )
+
+
+# ===== GET /api/v1/rendezvous =====
+
+@router.get("", response_model=list[RendezVousDetail])
+def list_rendezvous(
+    current_user: Utilisateur = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Liste des rendez-vous de l'utilisateur (tous statuts).
+    - Patient : ses rendez-vous.
+    - Médecin : les rendez-vous de son agenda.
+    """
+    q = db.query(RendezVous)
+    role = (current_user.role or "").lower()
+    if not settings.auth_disabled:
+        if role == "patient":
+            q = q.filter(RendezVous.patient_id == current_user.id)
+        elif role == "medecin":
+            q = q.filter(RendezVous.medecin_id == current_user.id)
+    rdvs = q.order_by(RendezVous.date_heure.desc()).all()
+    return [_rdv_detail(r, db) for r in rdvs]
+
+
+# ===== PATCH /api/v1/rendezvous/{id}/cancel =====
+
+@router.patch("/{rendezvous_id}/cancel", response_model=RendezVousConfirmResponse)
+def cancel_rendezvous(
+    rendezvous_id: int,
+    current_user: Utilisateur = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Annule un rendez-vous (patient ou médecin participant). Statut → ANNULE."""
+    rdv = db.query(RendezVous).filter(RendezVous.id == rendezvous_id).first()
+    if not rdv:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Rendez-vous introuvable")
+
+    if not settings.auth_disabled and current_user.id not in (rdv.patient_id, rdv.medecin_id):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Non autorisé")
+
+    if rdv.statut.upper() in ("ANNULE", "TERMINE"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Ce rendez-vous ne peut plus être annulé (statut : {rdv.statut})",
+        )
+
+    rdv.statut = "ANNULE"
+    db.commit()
+    db.refresh(rdv)
+    return {"id": rdv.id, "statut": rdv.statut}
