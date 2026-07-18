@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, Navigate } from 'react-router-dom';
+import { Link, Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../auth/useAuth';
 import Logo from '../components/ui/Logo';
 
@@ -9,6 +9,11 @@ const LoginPage = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [submitError, setSubmitError] = useState('');
   const { authenticated, error, initialized, isConfigured, login } = useAuth();
+  const location = useLocation();
+
+  // Revient sur la page initialement demandée, sinon le tableau de bord
+  // (celui-ci s'adapte déjà au rôle : patient, médecin ou administrateur).
+  const redirectTo = location.state?.from?.pathname || '/dashboard';
 
   if (!initialized) {
     return (
@@ -19,7 +24,7 @@ const LoginPage = () => {
   }
 
   if (authenticated) {
-    return <Navigate to="/" replace />;
+    return <Navigate to={redirectTo} replace />;
   }
 
   const handleSubmit = (e) => {
