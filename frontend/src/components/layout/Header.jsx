@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../auth/useAuth';
 import Avatar from '../ui/Avatar';
+import Logo from '../ui/Logo';
 
 const Header = () => {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -36,11 +37,8 @@ const Header = () => {
   return (
     <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-[#e6edf7]">
       <div className="max-w-6xl mx-auto px-4 h-16 flex justify-between items-center">
-        <Link to={authenticated ? '/dashboard' : '/'} className="flex items-center gap-2 tc-press">
-          <div className="w-9 h-9 bg-gradient-to-br from-brand-500 to-brand-700 rounded-xl flex items-center justify-center shadow-sm">
-            <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M12 4v16m8-8H4" /></svg>
-          </div>
-          <span className="text-lg font-bold text-brand-600 tracking-tight">TerangaCare</span>
+        <Link to={authenticated ? '/dashboard' : '/'} className="tc-press">
+          <Logo size={36} withName />
         </Link>
 
         {/* Desktop nav */}

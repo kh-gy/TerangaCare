@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, Navigate } from 'react-router-dom';
 import { useAuth } from '../auth/useAuth';
+import Logo from '../components/ui/Logo';
 
 const LoginPage = () => {
   const [email, setEmail] = useState('');
@@ -42,11 +43,7 @@ const LoginPage = () => {
       <div className="bg-white rounded-3xl shadow-lg w-full max-w-sm p-8">
         {/* Logo */}
         <div className="flex flex-col items-center mb-6">
-          <div className="w-16 h-16 bg-[#dbeafe] rounded-full flex items-center justify-center mb-4">
-            <svg className="w-8 h-8 text-[#1a3c6e]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
-            </svg>
-          </div>
+          <Logo size={60} className="mb-4" />
           <h1 className="text-2xl font-bold text-[#1a3c6e]">TerangaCare</h1>
           <p className="text-gray-500 text-sm text-center mt-1">
             Content de vous revoir. Connectez-vous avec votre compte TerangaCare.
